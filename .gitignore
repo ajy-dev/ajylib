@@ -1,1 +1,4 @@
 # ajylib - .gitignore
+
+## Build
+build/
