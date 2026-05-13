@@ -2,20 +2,21 @@
  * File: memory_pool.hpp
  * Path: library/include/ajy/memory/lockfree/memory_pool.hpp
  * Description:
- * 	Lock-free memory pool with mutex-guraded expansion.
+ * 	Lock-free memory pool with mutex-guarded expansion.
  * 	Requires a 64-bit platform with 48-bit canonical addresses.
  * Author: ajy-dev
  * Created: 2026-05-13
- * Updated: Never
+ * Updated: 2026-05-14
  * Version: 0.1.0
  */
 
 #ifndef AJY_MEMORY_LOCKFREE_MEMORY_POOL_HPP
 # define AJY_MEMORY_LOCKFREE_MEMORY_POOL_HPP
 
-# include <concepts>
 # include <cstddef>
 # include <cstdint>
+# include <concepts>
+# include <type_traits>
 # include <atomic>
 # include <mutex>
 # include <ajy/memory/concepts.hpp>
