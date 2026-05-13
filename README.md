@@ -13,6 +13,9 @@ Built from scratch for portfolio, personal reuse, and learning purposes.
 
 - Language: C++20
 - Platform: Windows (primary), Linux (under consideration)
+- Architecture: x86-64
+	- Some components rely on x86 TSO(Total Store Ordering) memory model
+	- Some components rely on 48-bit canonical address form
 - Build: CMake
 
 ## Status
@@ -34,6 +37,9 @@ Work in progress. Primarily intended for learning and experimentation.
 
 - 언어: C++20
 - 플랫폼: Windows (우선), Linux (고려 중)
+- 아키텍처: x86-64
+	- 일부 컴포넌트는 x86 TSO(Total Store Ordering) 메모리 모델에 의존
+	- 일부 컴포넌트는 48비트 canonical address form에 의존
 - 빌드: CMake
 
 ## 상태
