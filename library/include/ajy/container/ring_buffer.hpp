@@ -7,12 +7,12 @@
  * 	Relies on x86-64 TSO memory model and volatile to prevent compiler reordering.
  * Author: ajy-dev
  * Created: 2026-05-13
- * Updated: Never
+ * Updated: 2026-05-14
  * Version: 0.1.0
  */
 
-#ifndef AJY_RING_BUFFER_HPP
-# define AJY_RING_BUFFER_HPP
+#ifndef AJY_CONTAINER_RING_BUFFER_HPP
+# define AJY_CONTAINER_RING_BUFFER_HPP
 
 # include <cstddef>
 # include <cstdint>
