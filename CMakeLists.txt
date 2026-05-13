@@ -13,11 +13,11 @@ set(
 	CACHE{CMAKE_CONFIGURATION_TYPES}
 	TYPE STRING
 	HELP "Supported build configuration"
-	VALUE
-	Debug
-	NoOptRelease
-	Release
 	FORCE
+	VALUE
+		Debug
+		NoOptRelease
+		Release
 )
 
 if(MSVC)
