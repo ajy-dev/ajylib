@@ -4,7 +4,7 @@
  * Description: Concepts for ajy::memory allocators.
  * Author: ajy-dev
  * Created: 2026-05-13
- * Updated: Never
+ * Updated: 2026-05-14
  * Version: 0.1.0
  */
 
@@ -17,7 +17,7 @@ namespace ajy::memory
 {
 	template <typename T>
 	concept PoolableType =
-		std::is_object<T>::value 
+		std::is_object<T>::value
 		&& !std::is_const<T>::value
 		&& !std::is_volatile<T>::value;
 }
