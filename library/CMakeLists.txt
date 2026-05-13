@@ -5,11 +5,15 @@ add_library(
 
 target_sources(
 	ajylib
+	PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/source/container/ring_buffer.cpp
 	PUBLIC
 		FILE_SET HEADERS
 		BASE_DIRS
 			${CMAKE_CURRENT_SOURCE_DIR}/include
 		FILES
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/ajy.hpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/ring_buffer.hpp
 )
 
 if(MSVC)
