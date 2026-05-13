@@ -4,7 +4,7 @@
  * Description: A ring buffer definition.
  * Author: ajy-dev
  * Created: 2026-05-13
- * Updated: Never
+ * Updated: 2026-05-14
  * Version: 0.1.0
  */
 
@@ -144,16 +144,22 @@ namespace ajy::container
 
 	std::size_t RingBuffer::get_direct_read_size(void) const noexcept
 	{
-		std::size_t used_size = this->get_used_size();
-		std::size_t space_to_end = this->capacity - (this->read_index & this->mask);
+		std::size_t used_size;
+		std::size_t space_to_end;
+
+		used_size = this->get_used_size();
+		space_to_end = this->capacity - (this->read_index & this->mask);
 
 		return (space_to_end >= used_size) ? used_size : space_to_end;
 	}
 
 	std::size_t RingBuffer::get_direct_write_size(void) const noexcept
 	{
-		std::size_t free_size = this->get_free_size();
-		std::size_t space_to_end = this->capacity - (this->write_index & this->mask);
+		std::size_t free_size;
+		std::size_t space_to_end;
+
+		free_size = this->get_free_size();
+		space_to_end = this->capacity - (this->write_index & this->mask);
 
 		return (space_to_end >= free_size) ? free_size : space_to_end;
 	}
