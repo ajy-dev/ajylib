@@ -14,6 +14,10 @@ target_sources(
 		FILES
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/ajy.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/ring_buffer.hpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/shared_types.hpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/concepts.hpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/lockfree/memory_pool.hpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/lockfree/memory_pool.tpp
 )
 
 if(MSVC)
