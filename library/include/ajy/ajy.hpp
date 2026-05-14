@@ -13,6 +13,7 @@
 
 // container
 # include <ajy/container/ring_buffer.hpp>
+# include <ajy/container/serialization_buffer.hpp>
 
 // memory
 # include <ajy/memory/lockfree/memory_pool.hpp>

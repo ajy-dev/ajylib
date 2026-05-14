@@ -7,6 +7,7 @@ target_sources(
 	ajylib
 	PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}/source/container/ring_buffer.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/source/container/serialization_buffer.cpp
 	PUBLIC
 		FILE_SET HEADERS
 		BASE_DIRS
@@ -14,6 +15,8 @@ target_sources(
 		FILES
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/ajy.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/ring_buffer.hpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/serialization_buffer.hpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/serialization_buffer.tpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/shared_types.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/concepts.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/lockfree/memory_pool.hpp
