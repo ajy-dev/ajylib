@@ -17,6 +17,10 @@ target_sources(
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/ring_buffer.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/serialization_buffer.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/serialization_buffer.tpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/lockfree/stack.hpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/lockfree/stack.tpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/lockfree/queue.hpp
+			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/container/lockfree/queue.tpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/shared_types.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/concepts.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/include/ajy/memory/lockfree/memory_pool.hpp

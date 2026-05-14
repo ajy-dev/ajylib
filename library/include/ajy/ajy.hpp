@@ -15,6 +15,10 @@
 # include <ajy/container/ring_buffer.hpp>
 # include <ajy/container/serialization_buffer.hpp>
 
+// container::lockfree
+#include <ajy/container/lockfree/stack.hpp>
+#include <ajy/container/lockfree/queue.hpp>
+
 // memory
 # include <ajy/memory/lockfree/memory_pool.hpp>
 
