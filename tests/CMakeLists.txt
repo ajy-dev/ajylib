@@ -11,6 +11,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(
 	ajylib_test
 	placeholder_test.cpp
+	container/ring_buffer_test.cpp
 )
 
 target_link_libraries(
