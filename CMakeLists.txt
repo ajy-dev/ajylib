@@ -55,12 +55,14 @@ target_sources(
 	PRIVATE
 		# source files here
 		source/container/ring_buffer.cpp
+		source/container/serialization_buffer.cpp
 	PUBLIC
 		FILE_SET HEADERS
 		BASE_DIRS include
 		FILES
 			# header files here
 			include/ajy/container/ring_buffer.hpp
+			include/ajy/container/serialization_buffer.hpp
 )
 
 target_compile_features(
