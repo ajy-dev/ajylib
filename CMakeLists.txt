@@ -131,6 +131,13 @@ target_compile_definitions(
 		$<$<NOT:$<CONFIG:Debug>>:NDEBUG>
 )
 
+set_source_files_properties(
+	source/container/ring_buffer.cpp
+	PROPERTIES
+	COMPILE_OPTIONS
+	$<$<CXX_COMPILER_ID:MSVC>:/wd4458>
+)
+
 option(
 	AJYLIB_BUILD_TESTS
 	"Build tests"
