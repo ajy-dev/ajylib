@@ -7,9 +7,10 @@
  * Note:
  * 	OS-level deallocation is deferred until pool destruction.
  * 	Tagged pointers use upper 16 bits for ABA prevention.
+ * 	Requires a 64-bit platform with 48-bit canonical addresses.
  * Author: ajy-dev
  * Created: 2026-06-16
- * Updated: Never
+ * Updated: 2026-06-16
  * Version: 0.1.0
  */
 
@@ -32,7 +33,9 @@ namespace ajy::memory::lockfree
 	class MemoryPool
 	{
 	public:
-		explicit MemoryPool(std::size_t initial_capacity = 1024) noexcept;
+		static constexpr std::size_t DEFAULT_CAPACITY = 1024;
+
+		explicit MemoryPool(std::size_t initial_capacity = DEFAULT_CAPACITY) noexcept;
 		~MemoryPool(void) noexcept;
 
 		MemoryPool(const MemoryPool &other) = delete;
