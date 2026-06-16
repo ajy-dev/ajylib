@@ -19,6 +19,7 @@ target_sources(
 		container/ring_buffer_test.cpp
 		container/serialization_buffer_test.cpp
 		container/lockfree/stack_test.cpp
+		container/lockfree/queue_test.cpp
 		memory/lockfree/memory_pool_test.cpp
 )
 
