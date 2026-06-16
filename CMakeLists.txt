@@ -68,6 +68,7 @@ target_sources(
 			include/ajy/memory/concepts.hpp
 			include/ajy/memory/shared_types.hpp
 			include/ajy/memory/lockfree/memory_pool.hpp
+			include/ajy/memory/threadlocal/memory_pool.hpp
 )
 
 target_compile_features(
