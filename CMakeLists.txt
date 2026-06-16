@@ -63,6 +63,7 @@ target_sources(
 			# header files here
 			include/ajy/container/ring_buffer.hpp
 			include/ajy/container/serialization_buffer.hpp
+			include/ajy/container/lockfree/stack.hpp
 			include/ajy/memory/concepts.hpp
 			include/ajy/memory/shared_types.hpp
 			include/ajy/memory/lockfree/memory_pool.hpp
