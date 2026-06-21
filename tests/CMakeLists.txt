@@ -22,6 +22,8 @@ target_sources(
 		container/lockfree/queue_test.cpp
 		memory/lockfree/memory_pool_test.cpp
 		memory/threadlocal/memory_pool_test.cpp
+		io/stdio/output_device_test.cpp
+		$<$<PLATFORM_ID:Windows>:io/windows/output_device_test.cpp>
 )
 
 target_link_libraries(
