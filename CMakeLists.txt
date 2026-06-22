@@ -57,6 +57,7 @@ target_sources(
 		source/container/ring_buffer.cpp
 		source/container/serialization_buffer.cpp
 		source/io/stdio/output_device.cpp
+		source/utility/logger.cpp
 		$<$<PLATFORM_ID:Windows>:source/io/windows/output_device.cpp>
 	PUBLIC
 		FILE_SET HEADERS
@@ -73,6 +74,7 @@ target_sources(
 			include/ajy/memory/threadlocal/memory_pool.hpp
 			include/ajy/io/output_device.hpp
 			include/ajy/io/stdio/output_device.hpp
+			include/ajy/utility/logger.hpp
 			$<$<PLATFORM_ID:Windows>:include/ajy/io/windows/output_device.hpp>
 )
 
