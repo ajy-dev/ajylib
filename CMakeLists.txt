@@ -149,6 +149,7 @@ target_compile_definitions(
 
 set_source_files_properties(
 	source/container/ring_buffer.cpp
+	source/io/windows/output_device.cpp
 	PROPERTIES
 	COMPILE_OPTIONS
 	$<$<CXX_COMPILER_ID:MSVC>:/wd4458>
