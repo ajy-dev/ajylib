@@ -145,6 +145,7 @@ target_compile_definitions(
 	ajylib
 	PRIVATE
 		$<$<NOT:$<CONFIG:Debug>>:NDEBUG>
+		$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
 )
 
 set_source_files_properties(
