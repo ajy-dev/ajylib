@@ -5,7 +5,7 @@
  * 	A thread-local memory pool definition.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: Never
+ * Updated: 2026-06-26
  * Version: 0.1.0
  */
 
@@ -99,14 +99,21 @@ namespace ajy::memory::threadlocal
 		if (!ptr)
 			return nullptr;
 
-		try
+		if constexpr (std::is_nothrow_constructible<T, Args...>::value)
 		{
 			return ::new(ptr) T(std::forward<Args>(args)...);
 		}
-		catch (...)
+		else
 		{
-			this->free(ptr);
-			throw;
+			try
+			{
+				return ::new(ptr) T(std::forward<Args>(args)...);
+			}
+			catch (...)
+			{
+				this->free(ptr);
+				throw;
+			}
 		}
 	}
 
