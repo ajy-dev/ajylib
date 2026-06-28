@@ -12,7 +12,7 @@
  * 	Requires a 64-bit platform with 48-bit canonical addresses.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: Never
+ * Updated: 2026-06-28
  * Version: 0.1.0
  */
 
@@ -54,7 +54,7 @@ namespace ajy::memory::threadlocal
 
 		void destroy(T *ptr) noexcept(std::is_nothrow_destructible<T>::value)
 		requires std::destructible<T>;
-	
+
 	private:
 		struct TLSSlot
 		{
@@ -68,7 +68,6 @@ namespace ajy::memory::threadlocal
 
 			FreeNode *head;
 			std::size_t count;
-			lockfree::MemoryPool<T> *pool;
 		};
 
 		class IndexAllocator
@@ -91,13 +90,14 @@ namespace ajy::memory::threadlocal
 			std::mutex lock;
 		};
 
+		static lockfree::MemoryPool<T> &get_global_pool(void) noexcept;
+
 		void push(FreeNode *node) noexcept;
 		FreeNode *pop(void) noexcept;
 		bool has_tls_slot(void) const noexcept;
 		void refill_tls_from_global(void) noexcept;
 		void drain_tls_to_global(void) noexcept;
 
-		inline static lockfree::MemoryPool<T> global_pool;
 		inline static thread_local std::vector<TLSSlot> tls_freelists;
 		inline static IndexAllocator index_allocator;
 

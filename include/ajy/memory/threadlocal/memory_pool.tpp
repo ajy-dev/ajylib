@@ -5,7 +5,7 @@
  * 	A thread-local memory pool definition.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: 2026-06-26
+ * Updated: 2026-06-28
  * Version: 0.1.0
  */
 
@@ -78,7 +78,7 @@ namespace ajy::memory::threadlocal
 			}
 			catch (...)
 			{
-				this->global_pool.free(ptr);
+				this->get_global_pool().free(ptr);
 				return;
 			}
 		}
@@ -132,7 +132,6 @@ namespace ajy::memory::threadlocal
 	MemoryPool<T>::TLSSlot::TLSSlot(void) noexcept
 		: head(nullptr)
 		, count(0)
-		, pool(&MemoryPool<T>::global_pool)
 	{
 	}
 
@@ -147,7 +146,7 @@ namespace ajy::memory::threadlocal
 			FreeNode *next;
 
 			next = current->next;
-			this->pool->free(reinterpret_cast<T *>(current));
+			MemoryPool<T>::get_global_pool().free(reinterpret_cast<T *>(current));
 			current = next;
 		}
 	}
@@ -176,6 +175,14 @@ namespace ajy::memory::threadlocal
 		std::lock_guard<std::mutex> guard(this->lock);
 
 		this->free_indices.push(index);
+	}
+
+	template <PoolableType T>
+	lockfree::MemoryPool<T> &MemoryPool<T>::get_global_pool(void) noexcept
+	{
+		static lockfree::MemoryPool<T> *instance = new lockfree::MemoryPool<T>();
+
+		return *instance;
 	}
 
 	template <PoolableType T>
@@ -221,7 +228,7 @@ namespace ajy::memory::threadlocal
 		{
 			T *ptr;
 
-			ptr = this->global_pool.alloc();
+			ptr = this->get_global_pool().alloc();
 			if (!ptr)
 				return;
 
@@ -240,7 +247,7 @@ namespace ajy::memory::threadlocal
 			if (!node)
 				return;
 
-			this->global_pool.free(reinterpret_cast<T *>(node));
+			this->get_global_pool().free(reinterpret_cast<T *>(node));
 		}
 	}
 }
