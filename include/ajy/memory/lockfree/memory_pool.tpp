@@ -5,7 +5,7 @@
  * 	A lockfree memory pool definition.
  * Author: ajy-dev
  * Created: 2026-06-16
- * Updated: 2026-06-26
+ * Updated: 2026-06-28
  * Version: 0.1.0
  */
 
@@ -15,9 +15,12 @@
 #include <ajy/memory/lockfree/memory_pool.hpp>
 
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
+#include <exception>
 #include <mutex>
 #include <new>
+#include <system_error>
 #include <type_traits>
 #include <utility>
 
@@ -60,18 +63,19 @@ namespace ajy::memory::lockfree
 		if (node)
 			return reinterpret_cast<T *>(node);
 
-		this->expand_lock.lock();
-
-		while (!(node = this->pop()))
+		try
 		{
-			if (!this->expand(this->expand_size))
-			{
-				this->expand_lock.unlock();
-				return nullptr;
-			}
-		}
+			std::lock_guard<std::mutex> guard(this->expand_lock);
 
-		this->expand_lock.unlock();
+			while (!(node = this->pop()))
+				if (!this->expand(this->expand_size))
+					return nullptr;
+		}
+		catch (const std::system_error &error)
+		{
+			std::fprintf(stderr, "ajy::memory::lockfree::MemoryPool::alloc() failed: [Code: %d] %s\n", error.code().value(), error.what());
+			std::terminate();
+		}
 
 		return reinterpret_cast<T *>(node);
 	}

@@ -5,7 +5,7 @@
  * 	A thread-safe asynchronous logger definition.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: 2026-06-22
+ * Updated: 2026-06-28
  * Version: 0.1.0
  */
 
@@ -18,9 +18,11 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <exception>
 #include <memory>
 #include <new>
 #include <optional>
+#include <system_error>
 
 namespace ajy::utility
 {
@@ -51,47 +53,55 @@ namespace ajy::utility
 
 	std::size_t Logger::create(std::string_view name, std::unique_ptr<io::OutputDevice> sink) noexcept
 	{
-		std::lock_guard<std::mutex> guard(Logger::instance_creation_mutex);
-		std::size_t count;
-		std::size_t index;
-		Logger *logger_ptr;
-
-		if (name.empty() || name.size() > MAX_NAME_LENGTH)
-			return INVALID_NAME;
-
-		count = Logger::logger_instance_counter.load(std::memory_order_relaxed);
-
-		if (count >= MAX_LOGGER_COUNT)
-			return CAPACITY_EXCEEDED;
-
-		for (std::size_t i = 0; i < count; ++i)
-		{
-			if (Logger::instances[i]->name == name)
-				return DUPLICATE_NAME;
-		}
-
-		index = count;
-
 		try
 		{
-			Logger::instances[index] = std::unique_ptr<Logger>(new Logger(name, std::move(sink)));
+			std::lock_guard<std::mutex> guard(Logger::instance_creation_mutex);
+			std::size_t count;
+			std::size_t index;
+			Logger *logger_ptr;
+
+			if (name.empty() || name.size() > MAX_NAME_LENGTH)
+				return INVALID_NAME;
+
+			count = Logger::logger_instance_counter.load(std::memory_order_relaxed);
+
+			if (count >= MAX_LOGGER_COUNT)
+				return CAPACITY_EXCEEDED;
+
+			for (std::size_t i = 0; i < count; ++i)
+			{
+				if (Logger::instances[i]->name == name)
+					return DUPLICATE_NAME;
+			}
+
+			index = count;
+
+			try
+			{
+				Logger::instances[index] = std::unique_ptr<Logger>(new Logger(name, std::move(sink)));
+			}
+			catch (...)
+			{
+				return ALLOC_FAILED;
+			}
+
+			logger_ptr = Logger::instances[index].get();
+
+			if (!logger_ptr->start())
+			{
+				Logger::instances[index].reset();
+				return ALLOC_FAILED;
+			}
+
+			Logger::logger_instance_counter.fetch_add(1, std::memory_order_release);
+
+			return index;
 		}
-		catch (...)
+		catch (const std::system_error &error)
 		{
-			return ALLOC_FAILED;
+			std::fprintf(stderr, "ajy::utility::Logger::create() failed: [Code: %d] %s\n", error.code().value(), error.what());
+			std::terminate();
 		}
-
-		logger_ptr = Logger::instances[index].get();
-
-		if (!logger_ptr->start())
-		{
-			Logger::instances[index].reset();
-			return ALLOC_FAILED;
-		}
-
-		Logger::logger_instance_counter.fetch_add(1, std::memory_order_release);
-
-		return index;
 	}
 
 	Logger *Logger::get(std::size_t index) noexcept

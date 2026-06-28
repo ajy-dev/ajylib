@@ -15,7 +15,11 @@
 #include <ajy/memory/threadlocal/memory_pool.hpp>
 
 #include <cassert>
+#include <cstdio>
+#include <exception>
+#include <mutex>
 #include <new>
+#include <system_error>
 #include <type_traits>
 #include <utility>
 
@@ -154,27 +158,48 @@ namespace ajy::memory::threadlocal
 	template <PoolableType T>
 	std::size_t MemoryPool<T>::IndexAllocator::acquire(void) noexcept
 	{
-		std::lock_guard<std::mutex> guard(this->lock);
-
-		if (!this->free_indices.empty())
+		try
 		{
-			std::size_t index;
+			std::lock_guard<std::mutex> guard(this->lock);
 
-			index = this->free_indices.top();
-			this->free_indices.pop();
+			if (!this->free_indices.empty())
+			{
+				std::size_t index;
 
-			return index;
+				index = this->free_indices.top();
+				this->free_indices.pop();
+
+				return index;
+			}
+
+			return this->count++;
 		}
-
-		return this->count++;
+		catch (const std::system_error &error)
+		{
+			std::fprintf(stderr, "ajy::memory::threadlocal::MemoryPool::IndexAllocator::acquire() failed: [Code: %d] %s\n", error.code().value(), error.what());
+			std::terminate();
+		}
 	}
 
 	template <PoolableType T>
 	void MemoryPool<T>::IndexAllocator::release(std::size_t index) noexcept
 	{
-		std::lock_guard<std::mutex> guard(this->lock);
+		try
+		{
+			std::lock_guard<std::mutex> guard(this->lock);
 
-		this->free_indices.push(index);
+			this->free_indices.push(index);
+		}
+		catch (const std::system_error &error)
+		{
+			std::fprintf(stderr, "ajy::memory::threadlocal::MemoryPool::IndexAllocator::release() failed: [Code: %d] %s\n", error.code().value(), error.what());
+			std::terminate();
+		}
+		catch (const std::bad_alloc &error)
+		{
+			std::fprintf(stderr, "ajy::memory::threadlocal::MemoryPool::IndexAllocator::release() failed: %s\n", error.what());
+			std::terminate();
+		}
 	}
 
 	template <PoolableType T>
