@@ -59,6 +59,7 @@ target_sources(
 		source/io/stdio/output_device.cpp
 		source/utility/logger.cpp
 		$<$<PLATFORM_ID:Windows>:source/io/windows/output_device.cpp>
+		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/server.cpp>
 	PUBLIC
 		FILE_SET HEADERS
 		BASE_DIRS include
@@ -78,6 +79,7 @@ target_sources(
 			include/ajy/network/server.hpp
 			$<$<PLATFORM_ID:Windows>:include/ajy/io/windows/output_device.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/windows.hpp>
+			$<$<PLATFORM_ID:Windows>:include/ajy/network/windows/iocp/server.hpp>
 )
 
 target_compile_features(
@@ -150,9 +152,16 @@ target_compile_definitions(
 		$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
 )
 
+target_link_libraries(
+	ajylib
+	PUBLIC
+		$<$<PLATFORM_ID:Windows>:ws2_32>
+)
+
 set_source_files_properties(
 	source/container/ring_buffer.cpp
 	source/io/windows/output_device.cpp
+	source/network/windows/iocp/server.cpp
 	PROPERTIES
 	COMPILE_OPTIONS
 	$<$<CXX_COMPILER_ID:MSVC>:/wd4458>

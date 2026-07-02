@@ -1,0 +1,102 @@
+/**
+ * File: server.hpp
+ * Path: ajylib/include/ajy/network/windows/iocp/server.hpp
+ * Description:
+ *	A Windows IOCP TCP server declaration.
+ * Author: ajy-dev
+ * Created: 2026-06-30
+ * Updated: Never
+ * Version: 0.1.0
+ */
+
+#ifndef AJY_NETWORK_WINDOWS_IOCP_SERVER_HPP
+#define AJY_NETWORK_WINDOWS_IOCP_SERVER_HPP
+
+#include <ajy/container/ring_buffer.hpp>
+#include <ajy/memory/lockfree/memory_pool.hpp>
+#include <ajy/network/server.hpp>
+#include <ajy/utility/logger.hpp>
+#include <ajy/windows.hpp>
+
+#include <atomic>
+#include <cstdint>
+#include <mutex>
+#include <shared_mutex>
+#include <thread>
+#include <unordered_map>
+#include <vector>
+
+namespace ajy::network::windows::iocp
+{
+	class Server : public ajy::network::Server
+	{
+	public:
+		explicit Server(std::string_view logger_name) noexcept;
+		~Server(void) noexcept override;
+
+		Server(const Server &other) = delete;
+		Server &operator=(const Server &other) = delete;
+		Server(Server &&other) = delete;
+		Server &operator=(Server &&other) = delete;
+
+		bool start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept override;
+		void stop(void) noexcept override;
+
+		bool disconnect(SessionID id) noexcept override;
+		bool send_packet(SessionID id, container::SerializationBuffer *packet) noexcept override;
+
+		std::uint32_t get_session_count(void) const noexcept override;
+		std::uint32_t get_accept_tps(void) noexcept override;
+		std::uint32_t get_recv_message_tps(void) noexcept override;
+		std::uint32_t get_send_message_tps(void) noexcept override;
+
+	protected:
+		utility::Logger *logger;
+
+	private:
+		struct Session
+		{
+			SessionID id;
+			SOCKET socket;
+
+			OVERLAPPED recv_overlapped;
+			container::RingBuffer recv_buffer = container::RingBuffer(65535);
+
+			OVERLAPPED send_overlapped;
+			container::RingBuffer send_buffer = container::RingBuffer(65535);
+
+			std::atomic<bool> send_flag;
+			std::atomic<bool> disconnect_flag;
+			std::atomic<int> ref_count;
+
+			std::mutex lock;
+		};
+
+		static void accept_thread_proc(Server *server) noexcept;
+		static void worker_thread_proc(Server *server) noexcept;
+
+		bool recv_post(Session *session) noexcept;
+		bool send_post(Session *session) noexcept;
+		void decrement_ref_count(Session *session) noexcept;
+		void log_winapi_error(const char *func_name, DWORD error_code, utility::Logger::LogLevel level = utility::Logger::LogLevel::Error) noexcept;
+
+		HANDLE iocp_handle;
+		SOCKET listen_socket;
+		std::atomic<bool> running;
+		std::uint32_t max_sessions;
+
+		std::thread accept_thread;
+		std::vector<std::thread> worker_threads;
+
+		std::unordered_map<SessionID, Session *> session_map;
+		std::atomic<SessionID> next_sid;
+		mutable std::shared_mutex session_map_lock;
+		memory::lockfree::MemoryPool<Session> session_pool;
+
+		std::atomic<std::uint32_t> accept_tps;
+		std::atomic<std::uint32_t> recv_count;
+		std::atomic<std::uint32_t> send_count;
+	};
+}
+
+#endif
