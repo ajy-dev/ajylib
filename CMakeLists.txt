@@ -76,6 +76,7 @@ target_sources(
 			include/ajy/io/stdio/output_device.hpp
 			include/ajy/utility/logger.hpp
 			$<$<PLATFORM_ID:Windows>:include/ajy/io/windows/output_device.hpp>
+			$<$<PLATFORM_ID:Windows>:include/ajy/windows.hpp>
 )
 
 target_compile_features(
