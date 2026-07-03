@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server definition.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: Never
+ * Updated: 2026-07-03
  * Version: 0.1.0
  */
 
@@ -35,9 +35,15 @@ namespace ajy::network::windows::iocp
 		, max_sessions(0)
 		, next_sid(0)
 		, session_pool()
-		, accept_tps(0)
+		, accept_count(0)
 		, recv_count(0)
 		, send_count(0)
+		, last_accept_tps(0)
+		, last_recv_tps(0)
+		, last_send_tps(0)
+		, last_accept_query(ServerClock::now())
+		, last_recv_query(ServerClock::now())
+		, last_send_query(ServerClock::now())
 	{
 		if (!this->logger)
 		{
@@ -140,6 +146,15 @@ namespace ajy::network::windows::iocp
 		this->logger->log(utility::Logger::LogLevel::Info, "Listen socket is listening.");
 
 		this->max_sessions = max_sessions;
+		this->accept_count.store(0, std::memory_order_relaxed);
+		this->recv_count.store(0, std::memory_order_relaxed);
+		this->send_count.store(0, std::memory_order_relaxed);
+		this->last_accept_tps.store(0, std::memory_order_relaxed);
+		this->last_recv_tps.store(0, std::memory_order_relaxed);
+		this->last_send_tps.store(0, std::memory_order_relaxed);
+		this->last_accept_query.store(ServerClock::now(), std::memory_order_relaxed);
+		this->last_recv_query.store(ServerClock::now(), std::memory_order_relaxed);
+		this->last_send_query.store(ServerClock::now(), std::memory_order_relaxed);
 		this->running.store(true, std::memory_order_release);
 
 		try
@@ -499,17 +514,17 @@ clean_wsa:
 
 	std::uint32_t Server::get_accept_tps(void) noexcept
 	{
-		return this->accept_tps.exchange(0, std::memory_order_relaxed);
+		return this->calculate_tps(this->accept_count, this->last_accept_query, this->last_accept_tps);
 	}
 
 	std::uint32_t Server::get_recv_message_tps(void) noexcept
 	{
-		return this->recv_count.exchange(0, std::memory_order_relaxed);
+		return this->calculate_tps(this->recv_count, this->last_recv_query, this->last_recv_tps);
 	}
 
 	std::uint32_t Server::get_send_message_tps(void) noexcept
 	{
-		return this->send_count.exchange(0, std::memory_order_relaxed);
+		return this->calculate_tps(this->send_count, this->last_send_query, this->last_send_tps);
 	}
 
 	void Server::accept_thread_proc(Server *server) noexcept
@@ -589,7 +604,7 @@ clean_wsa:
 				std::terminate();
 			}
 
-			server->accept_tps.fetch_add(1, std::memory_order_relaxed);
+			server->accept_count.fetch_add(1, std::memory_order_relaxed);
 			session->ref_count.fetch_add(1, std::memory_order_relaxed);
 			if (server->recv_post(session))
 				server->on_client_join(session->id);
@@ -741,6 +756,33 @@ clean_wsa:
 			server->decrement_ref_count(session);
 			server->on_worker_thread_end();
 		}
+	}
+
+	std::uint32_t Server::calculate_tps(std::atomic<std::uint32_t> &counter, std::atomic<ServerClock::time_point> &last_query, std::atomic<std::uint32_t> &last_tps) noexcept
+	{
+		ServerClock::time_point now;
+		ServerClock::time_point previous;
+		std::uint32_t count;
+		std::chrono::duration<double> elapsed;
+		double tps;
+		std::uint32_t result;
+
+		now = ServerClock::now();
+		previous = last_query.exchange(now, std::memory_order_relaxed);
+
+		elapsed = now - previous;
+		if (elapsed.count() <= 0.0)
+			return last_tps.load(std::memory_order_relaxed);
+
+		count = counter.exchange(0, std::memory_order_relaxed);
+
+		tps = static_cast<double>(count) / elapsed.count();
+		result = (tps > static_cast<double>(std::numeric_limits<std::uint32_t>::max()))
+			? std::numeric_limits<std::uint32_t>::max()
+			: static_cast<std::uint32_t>(tps);
+
+		last_tps.store(result, std::memory_order_relaxed);
+		return result;
 	}
 
 	bool Server::recv_post(Session *session) noexcept

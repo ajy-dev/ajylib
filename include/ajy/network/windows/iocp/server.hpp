@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server declaration.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: Never
+ * Updated: 2026-07-03
  * Version: 0.1.0
  */
 
@@ -19,6 +19,7 @@
 #include <ajy/windows.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <mutex>
 #include <shared_mutex>
@@ -51,6 +52,11 @@ namespace ajy::network::windows::iocp
 		std::uint32_t get_send_message_tps(void) noexcept override;
 
 	protected:
+		using ServerClock = std::conditional<
+			std::chrono::high_resolution_clock::is_steady,
+			std::chrono::high_resolution_clock,
+			std::chrono::steady_clock>::type;
+
 		utility::Logger *logger;
 
 	private:
@@ -74,6 +80,7 @@ namespace ajy::network::windows::iocp
 
 		static void accept_thread_proc(Server *server) noexcept;
 		static void worker_thread_proc(Server *server) noexcept;
+		static std::uint32_t calculate_tps(std::atomic<std::uint32_t> &counter, std::atomic<ServerClock::time_point> &last_query, std::atomic<std::uint32_t> &last_tps) noexcept;
 
 		bool recv_post(Session *session) noexcept;
 		bool send_post(Session *session) noexcept;
@@ -93,9 +100,17 @@ namespace ajy::network::windows::iocp
 		mutable std::shared_mutex session_map_lock;
 		memory::lockfree::MemoryPool<Session> session_pool;
 
-		std::atomic<std::uint32_t> accept_tps;
+		std::atomic<std::uint32_t> accept_count;
 		std::atomic<std::uint32_t> recv_count;
 		std::atomic<std::uint32_t> send_count;
+
+		std::atomic<std::uint32_t> last_accept_tps;
+		std::atomic<std::uint32_t> last_recv_tps;
+		std::atomic<std::uint32_t> last_send_tps;
+
+		std::atomic<ServerClock::time_point> last_accept_query;
+		std::atomic<ServerClock::time_point> last_recv_query;
+		std::atomic<ServerClock::time_point> last_send_query;
 	};
 }
 
