@@ -2,39 +2,29 @@
  * File: main.cpp
  * Path: ajylib/examples/echo_server/main.cpp
  * Description:
- *	Entry point for the echo_server example. Runs until Ctrl+C is pressed.
+ *	Entry point for the echo_server example. Drives the server through an
+ *	interactive management console; type 'help' for available commands,
+ *	'exit' to quit.
  * Note:
- *	LOG_LEVEL and PORT below are hardcoded for quick editing.
+ *	LOG_LEVEL below is hardcoded for quick editing.
  * Author: ajy-dev
  * Created: 2026-07-02
- * Updated: Never
+ * Updated: 2026-07-03
  * Version: 0.1.0
  */
 
 #include "echo_server.hpp"
 
+#include <ajy/network/server_console_commands.hpp>
+#include <ajy/utility/console.hpp>
 #include <ajy/utility/logger.hpp>
-#include <ajy/windows.hpp>
 
-#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 
 namespace
 {
-	constexpr ajy::utility::Logger::LogLevel LOG_LEVEL = ajy::utility::Logger::LogLevel::Info;
-	constexpr std::uint16_t PORT = 6000;
-
-	HANDLE shutdown_event = nullptr;
-
-	BOOL WINAPI console_ctrl_handler(DWORD ctrl_type)
-	{
-		(void)ctrl_type;
-
-		if (shutdown_event)
-			::SetEvent(shutdown_event);
-
-		return TRUE;
-	}
+	constexpr ajy::utility::Logger::LogLevel LOG_LEVEL = ajy::utility::Logger::LogLevel::Warning;
 }
 
 int main(void)
@@ -53,35 +43,12 @@ int main(void)
 	logger->set_threshold(LOG_LEVEL);
 
 	EchoServer server("echo_server");
+	ajy::utility::Console console;
 
-	shutdown_event = ::CreateEventA(nullptr, TRUE, FALSE, nullptr);
-	if (!shutdown_event)
-	{
-		std::fprintf(stderr, "CreateEventA() failed.\n");
-		return EXIT_FAILURE;
-	}
+	ajy::network::register_server_commands(&console, &server);
 
-	if (!::SetConsoleCtrlHandler(console_ctrl_handler, TRUE))
-	{
-		std::fprintf(stderr, "SetConsoleCtrlHandler() failed.\n");
-		::CloseHandle(shutdown_event);
-		return EXIT_FAILURE;
-	}
+	std::printf("EchoServer management console. Type 'help' for commands, 'exit' to quit.\n");
+	console.run();
 
-	if (!server.start(nullptr, PORT, 0, false, 1024))
-	{
-		std::fprintf(stderr, "EchoServer::start() failed.\n");
-		::CloseHandle(shutdown_event);
-		return EXIT_FAILURE;
-	}
-
-	std::printf("EchoServer started on port %u. Press Ctrl+C to stop.\n", static_cast<unsigned int>(PORT));
-
-	::WaitForSingleObject(shutdown_event, INFINITE);
-
-	std::printf("Shutting down...\n");
-	server.stop();
-
-	::CloseHandle(shutdown_event);
 	return EXIT_SUCCESS;
 }
