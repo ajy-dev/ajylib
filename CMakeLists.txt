@@ -58,6 +58,7 @@ target_sources(
 		source/container/serialization_buffer.cpp
 		source/io/stdio/output_device.cpp
 		source/utility/logger.cpp
+		source/utility/console.cpp
 		$<$<PLATFORM_ID:Windows>:source/io/windows/output_device.cpp>
 		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/server.cpp>
 	PUBLIC
@@ -76,6 +77,7 @@ target_sources(
 			include/ajy/io/output_device.hpp
 			include/ajy/io/stdio/output_device.hpp
 			include/ajy/utility/logger.hpp
+			include/ajy/utility/console.hpp 
 			include/ajy/network/server.hpp
 			$<$<PLATFORM_ID:Windows>:include/ajy/io/windows/output_device.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/windows.hpp>
