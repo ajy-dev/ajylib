@@ -59,6 +59,7 @@ target_sources(
 		source/io/stdio/output_device.cpp
 		source/utility/logger.cpp
 		source/utility/console.cpp
+		source/network/server_console_commands.cpp
 		$<$<PLATFORM_ID:Windows>:source/io/windows/output_device.cpp>
 		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/server.cpp>
 	PUBLIC
@@ -79,6 +80,7 @@ target_sources(
 			include/ajy/utility/logger.hpp
 			include/ajy/utility/console.hpp 
 			include/ajy/network/server.hpp
+			include/ajy/network/server_console_commands.hpp
 			$<$<PLATFORM_ID:Windows>:include/ajy/io/windows/output_device.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/windows.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/network/windows/iocp/server.hpp>
