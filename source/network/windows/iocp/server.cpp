@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server definition.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-03
+ * Updated: 2026-07-04
  * Version: 0.1.0
  */
 
@@ -19,10 +19,9 @@
 #include <limits>
 #include <mutex>
 #include <new>
-#include <shared_mutex>
+#include <optional>
 #include <system_error>
 #include <thread>
-#include <unordered_map>
 #include <vector>
 
 namespace ajy::network::windows::iocp
@@ -31,19 +30,7 @@ namespace ajy::network::windows::iocp
 		: logger(utility::Logger::get(logger_name))
 		, iocp_handle(nullptr)
 		, listen_socket(INVALID_SOCKET)
-		, running(false)
 		, max_sessions(0)
-		, next_sid(0)
-		, session_pool()
-		, accept_count(0)
-		, recv_count(0)
-		, send_count(0)
-		, last_accept_tps(0)
-		, last_recv_tps(0)
-		, last_send_tps(0)
-		, last_accept_query(ServerClock::now())
-		, last_recv_query(ServerClock::now())
-		, last_send_query(ServerClock::now())
 	{
 		if (!this->logger)
 		{
@@ -146,6 +133,33 @@ namespace ajy::network::windows::iocp
 		this->logger->log(utility::Logger::LogLevel::Info, "Listen socket is listening.");
 
 		this->max_sessions = max_sessions;
+		try
+		{
+			this->sessions = std::make_unique<Session[]>(max_sessions);
+		}
+		catch (const std::bad_alloc &error)
+		{
+			this->logger->log(
+				utility::Logger::LogLevel::Error,
+				"std::make_unique<Session[]>(): %s",
+				error.what());
+			goto clean_socket;
+		}
+		this->logger->log(utility::Logger::LogLevel::Info, "Session array allocated.");
+
+		for (std::uint32_t i = 0; i < max_sessions; ++i)
+		{
+			this->sessions[i].index = i;
+			this->sessions[i].socket = INVALID_SOCKET;
+			if (!this->free_indices.push(i))
+			{
+				this->logger->log(utility::Logger::LogLevel::Error, "free_indices.push() failed at index %u", i);
+				goto clean_sessions;
+			}
+		}
+		this->logger->log(utility::Logger::LogLevel::Info, "Free index stack populated.");
+
+		this->active_session_count.store(0, std::memory_order_relaxed);
 		this->accept_count.store(0, std::memory_order_relaxed);
 		this->recv_count.store(0, std::memory_order_relaxed);
 		this->send_count.store(0, std::memory_order_relaxed);
@@ -255,6 +269,10 @@ clean_threads:
 		}
 clean_running:
 		this->running.store(false, std::memory_order_release);
+clean_sessions:
+		while (this->free_indices.pop().has_value())
+			;
+		this->sessions.reset();
 clean_socket:
 		::closesocket(this->listen_socket);
 		this->listen_socket = INVALID_SOCKET;
@@ -317,29 +335,20 @@ clean_wsa:
 		}
 		this->worker_threads.clear();
 
-		try
+		for (std::uint32_t i = 0; i < this->max_sessions; ++i)
 		{
-			std::unique_lock<std::shared_mutex> lock(this->session_map_lock);
-
-			for (std::pair<const SessionID, Session *> &pair : this->session_map)
+			if (this->sessions[i].socket != INVALID_SOCKET)
 			{
-				Session *session;
-
-				session = pair.second;
-				::closesocket(session->socket);
-				this->session_pool.destroy(session);
+				::closesocket(this->sessions[i].socket);
+				this->on_client_leave(this->pack_session_id(i, this->sessions[i].generation.load(std::memory_order_relaxed)));
 			}
-			this->session_map.clear();
 		}
-		catch (const std::system_error &error)
-		{
-			this->logger->log(
-				utility::Logger::LogLevel::Fatal,
-				"std::unique_lock(session_map_lock): [Code: %d] %s",
-				error.code().value(),
-				error.what());
-			std::terminate();
-		}
+		this->sessions.reset();
+
+		while (this->free_indices.pop().has_value())
+			;
+
+		this->active_session_count.store(0, std::memory_order_relaxed);
 
 		if (this->iocp_handle)
 		{
@@ -354,45 +363,14 @@ clean_wsa:
 	{
 		Session *session;
 
-		session = nullptr;
-
-		try
-		{
-			std::shared_lock<std::shared_mutex> lock(this->session_map_lock);
-			std::unordered_map<SessionID, Session *>::iterator it;
-
-			it = this->session_map.find(id);
-			if (it != this->session_map.end())
-			{
-				int ref_count;
-
-				session = it->second;
-				ref_count = session->ref_count.load(std::memory_order_relaxed);
-				while (ref_count)
-					if (session->ref_count.compare_exchange_weak(ref_count, ref_count + 1, std::memory_order_relaxed))
-						break;
-
-				if (!ref_count)
-					session = nullptr;
-			}
-		}
-		catch (const std::system_error &error)
-		{
-			this->logger->log(
-				utility::Logger::LogLevel::Fatal,
-				"std::shared_lock(session_map_lock): [Code: %d] %s",
-				error.code().value(),
-				error.what());
-			std::terminate();
-		}
-
+		session = this->acquire_session(id);
 		if (!session)
 			return false;
 
 		session->disconnect_flag.store(true, std::memory_order_relaxed);
 		::CancelIoEx(reinterpret_cast<HANDLE>(session->socket), nullptr);
 
-		this->decrement_ref_count(session);
+		this->release_session(session);
 		return true;
 	}
 
@@ -419,37 +397,7 @@ clean_wsa:
 			return false;
 		}
 
-		session = nullptr;
-
-		try
-		{
-			std::shared_lock<std::shared_mutex> lock(this->session_map_lock);
-			std::unordered_map<SessionID, Session *>::iterator it;
-
-			it = this->session_map.find(id);
-			if (it != this->session_map.end())
-			{
-				int ref_count;
-
-				session = it->second;
-				ref_count = session->ref_count.load(std::memory_order_relaxed);
-				while (ref_count)
-					if (session->ref_count.compare_exchange_weak(ref_count, ref_count + 1, std::memory_order_relaxed))
-						break;
-
-				if (!ref_count)
-					session = nullptr;
-			}
-		}
-		catch (const std::system_error &error)
-		{
-			this->logger->log(
-				utility::Logger::LogLevel::Fatal,
-				"std::shared_lock(session_map_lock): [Code: %d] %s",
-				error.code().value(),
-				error.what());
-			std::terminate();
-		}
+		session = this->acquire_session(id);
 		if (!session)
 			return false;
 
@@ -485,31 +433,13 @@ clean_wsa:
 			std::terminate();
 		}
 
-		this->decrement_ref_count(session);
+		this->release_session(session);
 		return success;
 	}
 
 	std::uint32_t Server::get_session_count(void) const noexcept
 	{
-		std::uint32_t count;
-
-		try
-		{
-			std::shared_lock<std::shared_mutex> lock(this->session_map_lock);
-
-			count = static_cast<std::uint32_t>(this->session_map.size());
-		}
-		catch (const std::system_error &error)
-		{
-			this->logger->log(
-				utility::Logger::LogLevel::Fatal,
-				"std::shared_lock(session_map_lock): [Code: %d] %s",
-				error.code().value(),
-				error.what());
-			std::terminate();
-		}
-
-		return count;
+		return this->active_session_count.load(std::memory_order_relaxed);
 	}
 
 	std::uint32_t Server::get_accept_tps(void) noexcept
@@ -533,6 +463,7 @@ clean_wsa:
 		int addr_len;
 		SOCKET client_socket;
 		char ip[16];
+		std::optional<std::uint32_t> index;
 		Session *session;
 
 		while (server->running.load(std::memory_order_acquire))
@@ -553,62 +484,33 @@ clean_wsa:
 				continue;
 			}
 
-			session = server->session_pool.create();
-			if (!session)
+			index = server->free_indices.pop();
+			if (!index.has_value())
 			{
-				server->logger->log(utility::Logger::LogLevel::Error, "Session allocation failed. No memory.");
+				server->logger->log(utility::Logger::LogLevel::Warning, "Session limit reached. Connection refused.");
 				::closesocket(client_socket);
 				continue;
 			}
 
-			session->id = server->next_sid.fetch_add(1, std::memory_order_relaxed);
+			session = &server->sessions[index.value()];
 			session->socket = client_socket;
 
 			if (!::CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), server->iocp_handle, reinterpret_cast<ULONG_PTR>(session), 0))
 			{
 				server->log_winapi_error("CreateIoCompletionPort()", ::GetLastError());
-				server->session_pool.destroy(session);
 				::closesocket(client_socket);
+				session->socket = INVALID_SOCKET;
+				if (!server->free_indices.push(index.value()))
+					server->logger->log(utility::Logger::LogLevel::Error, "free_indices.push() failed. Slot lost. index: %u", index.value());
 				continue;
 			}
 
-			try
-			{
-				std::unique_lock<std::shared_mutex> lock(server->session_map_lock);
-
-				if (server->session_map.size() >= server->max_sessions)
-				{
-					lock.unlock();
-					server->logger->log(utility::Logger::LogLevel::Warning, "Session limit reached. Connection refused.");
-					server->session_pool.destroy(session);
-					::closesocket(client_socket);
-					continue;
-				}
-				server->session_map.emplace(session->id, session);
-			}
-			catch (const std::system_error &error)
-			{
-				server->logger->log(
-					utility::Logger::LogLevel::Fatal,
-					"std::unique_lock(session_map_lock): [Code: %d] %s",
-					error.code().value(),
-					error.what());
-				std::terminate();
-			}
-			catch (const std::bad_alloc &error)
-			{
-				server->logger->log(
-					utility::Logger::LogLevel::Fatal,
-					"std::unordered_map::emplace(session_map): %s",
-					error.what());
-				std::terminate();
-			}
-
 			server->accept_count.fetch_add(1, std::memory_order_relaxed);
+			server->active_session_count.fetch_add(1, std::memory_order_relaxed);
 			session->ref_count.fetch_add(1, std::memory_order_relaxed);
 			if (server->recv_post(session))
-				server->on_client_join(session->id);
-			server->decrement_ref_count(session);
+				server->on_client_join(server->pack_session_id(index.value(), session->generation.load(std::memory_order_relaxed)));
+			server->release_session(session);
 		}
 	}
 
@@ -621,6 +523,7 @@ clean_wsa:
 			LPOVERLAPPED overlapped;
 			BOOL gqcs_ret;
 			Session *session;
+			SessionID id;
 
 			gqcs_ret = ::GetQueuedCompletionStatus(server->iocp_handle, &bytes_transferred, &completion_key, &overlapped, INFINITE);
 			server->on_worker_thread_begin();
@@ -634,6 +537,7 @@ clean_wsa:
 			}
 
 			session = reinterpret_cast<Session *>(completion_key);
+			id = server->pack_session_id(session->index, session->generation.load(std::memory_order_relaxed));
 
 			if (!gqcs_ret)
 			{
@@ -652,17 +556,17 @@ clean_wsa:
 					level = utility::Logger::LogLevel::Error;
 					break;
 				}
-				std::sprintf(func_name, "GetQueuedCompletionStatus(id: %llu)", session->id);
+				std::sprintf(func_name, "GetQueuedCompletionStatus(id: %llu)", id);
 				server->log_winapi_error(func_name, error_code, level);
-				server->decrement_ref_count(session);
+				server->release_session(session);
 				server->on_worker_thread_end();
 				continue;
 			}
 
 			if (!bytes_transferred)
 			{
-				server->logger->log(utility::Logger::LogLevel::Info, "Session gracefully disconnected. id: %llu", session->id);
-				server->decrement_ref_count(session);
+				server->logger->log(utility::Logger::LogLevel::Info, "Session gracefully disconnected. id: %llu", id);
+				server->release_session(session);
 				server->on_worker_thread_end();
 				continue;
 			}
@@ -720,7 +624,7 @@ clean_wsa:
 				for (container::SerializationBuffer &packet : packets)
 				{
 					server->recv_count.fetch_add(1, std::memory_order_relaxed);
-					server->on_recv(session->id, &packet);
+					server->on_recv(id, &packet);
 				}
 			}
 			else if (overlapped == &session->send_overlapped)
@@ -750,15 +654,32 @@ clean_wsa:
 				}
 
 				server->send_count.fetch_add(1, std::memory_order_relaxed);
-				server->on_send(session->id, static_cast<std::size_t>(bytes_transferred));
+				server->on_send(id, static_cast<std::size_t>(bytes_transferred));
 			}
 
-			server->decrement_ref_count(session);
+			server->release_session(session);
 			server->on_worker_thread_end();
 		}
 	}
 
-	std::uint32_t Server::calculate_tps(std::atomic<std::uint32_t> &counter, std::atomic<ServerClock::time_point> &last_query, std::atomic<std::uint32_t> &last_tps) noexcept
+	Server::SessionID Server::pack_session_id(std::uint32_t index, std::uint32_t generation) noexcept
+	{
+		static constexpr unsigned int GENERATION_SHIFT = 32;
+
+		return (static_cast<SessionID>(generation) << GENERATION_SHIFT) | static_cast<SessionID>(index);
+	}
+
+	std::pair<std::uint32_t, std::uint32_t> Server::unpack_session_id(SessionID id) noexcept
+	{
+		static constexpr unsigned int GENERATION_SHIFT = 32;
+
+		return std::pair<std::uint32_t, std::uint32_t>(static_cast<std::uint32_t>(id), static_cast<std::uint32_t>(id >> GENERATION_SHIFT));
+	}
+
+	std::uint32_t Server::calculate_tps(
+		std::atomic<std::uint32_t> &counter,
+		std::atomic<ServerClock::time_point> &last_query,
+		std::atomic<std::uint32_t> &last_tps) noexcept
 	{
 		ServerClock::time_point now;
 		ServerClock::time_point previous;
@@ -785,6 +706,76 @@ clean_wsa:
 		return result;
 	}
 
+	Server::Session *Server::acquire_session(SessionID id) noexcept
+	{
+		std::pair<std::uint32_t, std::uint32_t> decoded;
+		Session *session;
+		int ref_count;
+
+		decoded = this->unpack_session_id(id);
+
+		if (!this->sessions || decoded.first >= this->max_sessions)
+			return nullptr;
+
+		session = &this->sessions[decoded.first];
+
+		ref_count = session->ref_count.load(std::memory_order_relaxed);
+		while (ref_count)
+			if (session->ref_count.compare_exchange_weak(ref_count, ref_count + 1, std::memory_order_relaxed))
+				break;
+
+		if (!ref_count)
+			return nullptr;
+
+		if (session->generation.load(std::memory_order_relaxed) != decoded.second)
+		{
+			this->release_session(session);
+			return nullptr;
+		}
+
+		return session;
+	}
+
+	void Server::release_session(Session *session) noexcept
+	{
+		if (session->ref_count.fetch_sub(1, std::memory_order_release) == 1)
+		{
+			SessionID id;
+
+			try
+			{
+				std::lock_guard<std::mutex> barrier(session->lock);
+			}
+			catch (const std::system_error &error)
+			{
+				this->logger->log(
+					utility::Logger::LogLevel::Fatal,
+					"std::lock_guard(session->lock): [Code: %d] %s",
+					error.code().value(),
+					error.what());
+				std::terminate();
+			}
+
+			id = this->pack_session_id(session->index, session->generation.load(std::memory_order_relaxed));
+
+			::closesocket(session->socket);
+			session->socket = INVALID_SOCKET;
+
+			session->generation.fetch_add(1, std::memory_order_relaxed);
+			session->recv_buffer.clear();
+			session->send_buffer.clear();
+			session->send_flag.store(false, std::memory_order_relaxed);
+			session->disconnect_flag.store(false, std::memory_order_relaxed);
+
+			if (!this->free_indices.push(session->index))
+				this->logger->log(utility::Logger::LogLevel::Error, "free_indices.push() failed. Slot lost. index: %u", session->index);
+
+			this->active_session_count.fetch_sub(1, std::memory_order_relaxed);
+
+			this->on_client_leave(id);
+		}
+	}
+
 	bool Server::recv_post(Session *session) noexcept
 	{
 		WSABUF wsabuf[2];
@@ -793,12 +784,13 @@ clean_wsa:
 		std::size_t total_free;
 		std::size_t first;
 		std::size_t second;
-		int ref_count;
+		SessionID id;
 
+		id = this->pack_session_id(session->index, session->generation.load(std::memory_order_relaxed));
 		total_free = session->recv_buffer.get_free_size();
 		if (!total_free)
 		{
-			this->logger->log(utility::Logger::LogLevel::Error, "recv_post(): recv_buffer is full. id: %llu", session->id);
+			this->logger->log(utility::Logger::LogLevel::Error, "recv_post(): recv_buffer is full. id: %llu", id);
 			return false;
 		}
 
@@ -817,12 +809,7 @@ clean_wsa:
 		if (session->disconnect_flag.load(std::memory_order_relaxed))
 			return false;
 
-		ref_count = session->ref_count.load(std::memory_order_relaxed);
-		while (ref_count)
-			if (session->ref_count.compare_exchange_weak(ref_count, ref_count + 1, std::memory_order_relaxed))
-				break;
-
-		if (!ref_count)
+		if (!this->acquire_session(id))
 			return false;
 
 		if (::WSARecv(session->socket, wsabuf, second ? 2 : 1, &recv_bytes, &flags, &session->recv_overlapped, nullptr) == SOCKET_ERROR)
@@ -844,7 +831,7 @@ clean_wsa:
 					break;
 				}
 				this->log_winapi_error("WSARecv()", error_code, level);
-				this->decrement_ref_count(session);
+				this->release_session(session);
 				return false;
 			}
 		}
@@ -859,8 +846,9 @@ clean_wsa:
 		std::size_t total_used;
 		std::size_t first;
 		std::size_t second;
-		int ref_count;
+		SessionID id;
 
+		id = this->pack_session_id(session->index, session->generation.load(std::memory_order_relaxed));
 		total_used = session->send_buffer.get_used_size();
 		if (!total_used)
 			return false;
@@ -880,12 +868,7 @@ clean_wsa:
 		if (session->disconnect_flag.load(std::memory_order_relaxed))
 			return false;
 
-		ref_count = session->ref_count.load(std::memory_order_relaxed);
-		while (ref_count)
-			if (session->ref_count.compare_exchange_weak(ref_count, ref_count + 1, std::memory_order_relaxed))
-				break;
-
-		if (!ref_count)
+		if (!this->acquire_session(id))
 			return false;
 
 		if (::WSASend(session->socket, wsabuf, second ? 2 : 1, &send_bytes, flags, &session->send_overlapped, nullptr) == SOCKET_ERROR)
@@ -907,57 +890,12 @@ clean_wsa:
 					break;
 				}
 				this->log_winapi_error("WSASend()", error_code, level);
-				this->decrement_ref_count(session);
+				this->release_session(session);
 				return false;
 			}
 		}
 
 		return true;
-	}
-
-	void Server::decrement_ref_count(Session *session) noexcept
-	{
-		if (session->ref_count.fetch_sub(1, std::memory_order_release) == 1)
-		{
-			SessionID id;
-
-			id = session->id;
-
-			try
-			{
-				std::unique_lock<std::shared_mutex> lock(this->session_map_lock);
-
-				this->session_map.erase(id);
-
-				try
-				{
-					std::lock_guard<std::mutex> barrier(session->lock);
-				}
-				catch (const std::system_error &error)
-				{
-					this->logger->log(
-						utility::Logger::LogLevel::Fatal,
-						"std::lock_guard(session->lock): [Code: %d] %s",
-						error.code().value(),
-						error.what());
-					std::terminate();
-				}
-			}
-			catch (const std::system_error &error)
-			{
-				this->logger->log(
-					utility::Logger::LogLevel::Fatal,
-					"std::unique_lock(session_map_lock): [Code: %d] %s",
-					error.code().value(),
-					error.what());
-				std::terminate();
-			}
-
-			::closesocket(session->socket);
-			this->session_pool.destroy(session);
-
-			this->on_client_leave(id);
-		}
 	}
 
 	void Server::log_winapi_error(const char *func_name, DWORD error_code, utility::Logger::LogLevel level) noexcept

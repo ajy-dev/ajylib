@@ -5,15 +5,15 @@
  *	A Windows IOCP TCP server declaration.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-03
+ * Updated: 2026-07-04
  * Version: 0.1.0
  */
 
 #ifndef AJY_NETWORK_WINDOWS_IOCP_SERVER_HPP
 #define AJY_NETWORK_WINDOWS_IOCP_SERVER_HPP
 
+#include <ajy/container/lockfree/stack.hpp>
 #include <ajy/container/ring_buffer.hpp>
-#include <ajy/memory/lockfree/memory_pool.hpp>
 #include <ajy/network/server.hpp>
 #include <ajy/utility/logger.hpp>
 #include <ajy/windows.hpp>
@@ -21,10 +21,10 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <mutex>
-#include <shared_mutex>
 #include <thread>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace ajy::network::windows::iocp
@@ -62,7 +62,8 @@ namespace ajy::network::windows::iocp
 	private:
 		struct Session
 		{
-			SessionID id;
+			std::uint32_t index;
+
 			SOCKET socket;
 
 			OVERLAPPED recv_overlapped;
@@ -74,17 +75,28 @@ namespace ajy::network::windows::iocp
 			std::atomic<bool> send_flag;
 			std::atomic<bool> disconnect_flag;
 			std::atomic<int> ref_count;
+			std::atomic<std::uint32_t> generation;
 
 			std::mutex lock;
 		};
 
 		static void accept_thread_proc(Server *server) noexcept;
 		static void worker_thread_proc(Server *server) noexcept;
-		static std::uint32_t calculate_tps(std::atomic<std::uint32_t> &counter, std::atomic<ServerClock::time_point> &last_query, std::atomic<std::uint32_t> &last_tps) noexcept;
+
+		static SessionID pack_session_id(std::uint32_t index, std::uint32_t generation) noexcept;
+		static std::pair<std::uint32_t, std::uint32_t> unpack_session_id(SessionID id) noexcept;
+
+		static std::uint32_t calculate_tps(
+			std::atomic<std::uint32_t> &counter,
+			std::atomic<ServerClock::time_point> &last_query,
+			std::atomic<std::uint32_t> &last_tps) noexcept;
+
+		Session *acquire_session(SessionID id) noexcept;
+		void release_session(Session *session) noexcept;
 
 		bool recv_post(Session *session) noexcept;
 		bool send_post(Session *session) noexcept;
-		void decrement_ref_count(Session *session) noexcept;
+
 		void log_winapi_error(const char *func_name, DWORD error_code, utility::Logger::LogLevel level = utility::Logger::LogLevel::Error) noexcept;
 
 		HANDLE iocp_handle;
@@ -95,10 +107,9 @@ namespace ajy::network::windows::iocp
 		std::thread accept_thread;
 		std::vector<std::thread> worker_threads;
 
-		std::unordered_map<SessionID, Session *> session_map;
-		std::atomic<SessionID> next_sid;
-		mutable std::shared_mutex session_map_lock;
-		memory::lockfree::MemoryPool<Session> session_pool;
+		std::unique_ptr<Session[]> sessions;
+		container::lockfree::Stack<std::uint32_t> free_indices;
+		std::atomic<std::uint32_t> active_session_count;
 
 		std::atomic<std::uint32_t> accept_count;
 		std::atomic<std::uint32_t> recv_count;
