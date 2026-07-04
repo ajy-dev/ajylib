@@ -5,14 +5,12 @@
  * 	A pure abstract TCP server interface declaration.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: Never
+ * Updated: 2026-07-04
  * Version: 0.1.0
  */
 
 #ifndef AJY_NETWORK_SERVER_HPP
 #define AJY_NETWORK_SERVER_HPP
-
-#include <ajy/container/serialization_buffer.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -36,21 +34,11 @@ namespace ajy::network
 		virtual void stop(void) noexcept = 0;
 
 		virtual bool disconnect(SessionID id) noexcept = 0;
-		virtual bool send_packet(SessionID id, container::SerializationBuffer *packet) noexcept = 0;
 
 		virtual std::uint32_t get_session_count(void) const noexcept = 0;
 		virtual std::uint32_t get_accept_tps(void) noexcept = 0;
 		virtual std::uint32_t get_recv_message_tps(void) noexcept = 0;
 		virtual std::uint32_t get_send_message_tps(void) noexcept = 0;
-
-	protected:
-		virtual bool on_connection_request(const char *ip, std::uint16_t port) = 0;
-		virtual void on_client_join(SessionID id) noexcept = 0;
-		virtual void on_client_leave(SessionID id) noexcept = 0;
-		virtual void on_recv(SessionID id, container::SerializationBuffer *packet) noexcept = 0;
-		virtual void on_send(SessionID id, std::size_t size) noexcept = 0;
-		virtual void on_worker_thread_begin(void) noexcept = 0;
-		virtual void on_worker_thread_end(void) noexcept = 0;
 	};
 }
 

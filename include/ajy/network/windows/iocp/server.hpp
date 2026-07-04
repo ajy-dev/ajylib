@@ -14,6 +14,7 @@
 
 #include <ajy/container/lockfree/stack.hpp>
 #include <ajy/container/ring_buffer.hpp>
+#include <ajy/network/protocol/packet_buffer.hpp>
 #include <ajy/network/server.hpp>
 #include <ajy/utility/logger.hpp>
 #include <ajy/windows.hpp>
@@ -44,7 +45,6 @@ namespace ajy::network::windows::iocp
 		void stop(void) noexcept override;
 
 		bool disconnect(SessionID id) noexcept override;
-		bool send_packet(SessionID id, container::SerializationBuffer *packet) noexcept override;
 
 		std::uint32_t get_session_count(void) const noexcept override;
 		std::uint32_t get_accept_tps(void) noexcept override;
@@ -56,6 +56,17 @@ namespace ajy::network::windows::iocp
 			std::chrono::high_resolution_clock::is_steady,
 			std::chrono::high_resolution_clock,
 			std::chrono::steady_clock>::type;
+		using Packet = protocol::PacketBuffer;
+
+		virtual bool on_connection_request(const char *ip, std::uint16_t port) = 0;
+		virtual void on_client_join(SessionID id) noexcept = 0;
+		virtual void on_client_leave(SessionID id) noexcept = 0;
+		virtual void on_recv(SessionID id, Packet *packet) noexcept = 0;
+		virtual void on_send(SessionID id, std::size_t size) noexcept = 0;
+		virtual void on_worker_thread_begin(void) noexcept = 0;
+		virtual void on_worker_thread_end(void) noexcept = 0;
+
+		bool send_packet(SessionID id, Packet *packet) noexcept;
 
 		utility::Logger *logger;
 

@@ -5,7 +5,7 @@
  *	A minimal echo server built on ajy::network::windows::iocp::Server.
  * Author: ajy-dev
  * Created: 2026-07-02
- * Updated: Never
+ * Updated: 2026-07-04
  * Version: 0.1.0
  */
 
@@ -29,7 +29,7 @@ void EchoServer::on_client_leave(SessionID id) noexcept
 	this->logger->log(ajy::utility::Logger::LogLevel::Info, "client left. id: %llu", id);
 }
 
-void EchoServer::on_recv(SessionID id, ajy::container::SerializationBuffer *packet) noexcept
+void EchoServer::on_recv(SessionID id, Packet *packet) noexcept
 {
 	this->send_packet(id, packet);
 }

@@ -10,7 +10,7 @@
  */
 
 #include <ajy/network/windows/iocp/server.hpp>
-#include <ajy/container/serialization_buffer.hpp>
+#include <ajy/network/protocol/packet_buffer.hpp>
 #include <ajy/windows.hpp>
 
 #include <cstdio>
@@ -374,11 +374,29 @@ clean_wsa:
 		return true;
 	}
 
-	bool Server::send_packet(SessionID id, container::SerializationBuffer *packet) noexcept
+	std::uint32_t Server::get_session_count(void) const noexcept
+	{
+		return this->active_session_count.load(std::memory_order_relaxed);
+	}
+
+	std::uint32_t Server::get_accept_tps(void) noexcept
+	{
+		return this->calculate_tps(this->accept_count, this->last_accept_query, this->last_accept_tps);
+	}
+
+	std::uint32_t Server::get_recv_message_tps(void) noexcept
+	{
+		return this->calculate_tps(this->recv_count, this->last_recv_query, this->last_recv_tps);
+	}
+
+	std::uint32_t Server::get_send_message_tps(void) noexcept
+	{
+		return this->calculate_tps(this->send_count, this->last_send_query, this->last_send_tps);
+	}
+
+	bool Server::send_packet(SessionID id, Packet *packet) noexcept
 	{
 		Session *session;
-		const void *payload;
-		std::uint16_t payload_length;
 		bool success;
 
 		if (!packet)
@@ -391,28 +409,21 @@ clean_wsa:
 			this->logger->log(utility::Logger::LogLevel::Error, "send_packet(): packet is empty. id: %llu", id);
 			return false;
 		}
-		if (packet->get_data_size() > std::numeric_limits<std::uint16_t>::max())
-		{
-			this->logger->log(utility::Logger::LogLevel::Error, "send_packet(): packet too large (%zu bytes). id: %llu", packet->get_data_size(), id);
-			return false;
-		}
 
 		session = this->acquire_session(id);
 		if (!session)
 			return false;
 
-		payload = packet->get_buffer_ptr();
-		payload_length = static_cast<std::uint16_t>(packet->get_data_size());
+		packet->build_header();
 		success = false;
 
 		try
 		{
 			std::lock_guard<std::mutex> lock(session->lock);
 
-			if (session->send_buffer.get_free_size() >= sizeof(payload_length) + payload_length)
+			if (session->send_buffer.get_free_size() >= packet->get_packet_size())
 			{
-				session->send_buffer.write(&payload_length, sizeof(payload_length));
-				session->send_buffer.write(payload, payload_length);
+				session->send_buffer.write(packet->get_buffer_ptr(), packet->get_packet_size());
 
 				this->send_count.fetch_add(1, std::memory_order_relaxed);
 
@@ -437,26 +448,6 @@ clean_wsa:
 
 		this->release_session(session);
 		return success;
-	}
-
-	std::uint32_t Server::get_session_count(void) const noexcept
-	{
-		return this->active_session_count.load(std::memory_order_relaxed);
-	}
-
-	std::uint32_t Server::get_accept_tps(void) noexcept
-	{
-		return this->calculate_tps(this->accept_count, this->last_accept_query, this->last_accept_tps);
-	}
-
-	std::uint32_t Server::get_recv_message_tps(void) noexcept
-	{
-		return this->calculate_tps(this->recv_count, this->last_recv_query, this->last_recv_tps);
-	}
-
-	std::uint32_t Server::get_send_message_tps(void) noexcept
-	{
-		return this->calculate_tps(this->send_count, this->last_send_query, this->last_send_tps);
 	}
 
 	void Server::accept_thread_proc(Server *server) noexcept
@@ -575,8 +566,7 @@ clean_wsa:
 
 			if (overlapped == &session->recv_overlapped)
 			{
-				constexpr std::size_t HEADER_SIZE = sizeof(std::uint16_t);
-				std::vector<container::SerializationBuffer> packets;
+				std::vector<Packet> packets;
 
 				try
 				{
@@ -590,18 +580,19 @@ clean_wsa:
 						std::uint16_t payload_length;
 						std::size_t total_size;
 
-						if (session->recv_buffer.get_used_size() < HEADER_SIZE)
+						if (session->recv_buffer.get_used_size() < Packet::HEADER_SIZE)
 							break;
-						session->recv_buffer.peek(&payload_length, HEADER_SIZE);
-						total_size = HEADER_SIZE + payload_length;
+						session->recv_buffer.peek(&payload_length, Packet::HEADER_SIZE);
+						total_size = Packet::HEADER_SIZE + payload_length;
 
 						if (session->recv_buffer.get_used_size() < total_size)
 							break;
 
-						session->recv_buffer.commit_direct_read(HEADER_SIZE);
+						session->recv_buffer.commit_direct_read(Packet::HEADER_SIZE);
 
 						packets.emplace_back(payload_length);
-						session->recv_buffer.read(packets.back().get_buffer_ptr(), payload_length);
+						packets.back().set_header(&payload_length);
+						session->recv_buffer.read(packets.back().get_payload_ptr(), payload_length);
 						packets.back().commit_direct_serialize(payload_length);
 					}
 				}
@@ -623,7 +614,7 @@ clean_wsa:
 					std::terminate();
 				}
 
-				for (container::SerializationBuffer &packet : packets)
+				for (Packet &packet : packets)
 				{
 					server->recv_count.fetch_add(1, std::memory_order_relaxed);
 					server->on_recv(id, &packet);
