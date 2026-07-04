@@ -414,6 +414,8 @@ clean_wsa:
 				session->send_buffer.write(&payload_length, sizeof(payload_length));
 				session->send_buffer.write(payload, payload_length);
 
+				this->send_count.fetch_add(1, std::memory_order_relaxed);
+
 				if (!session->send_flag.exchange(true, std::memory_order_relaxed))
 					if (!this->send_post(session))
 						session->send_flag.store(false, std::memory_order_relaxed);
@@ -653,7 +655,6 @@ clean_wsa:
 					std::terminate();
 				}
 
-				server->send_count.fetch_add(1, std::memory_order_relaxed);
 				server->on_send(id, static_cast<std::size_t>(bytes_transferred));
 			}
 
