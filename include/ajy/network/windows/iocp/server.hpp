@@ -66,7 +66,8 @@ namespace ajy::network::windows::iocp
 		virtual void on_worker_thread_begin(void) noexcept = 0;
 		virtual void on_worker_thread_end(void) noexcept = 0;
 
-		bool send_packet(SessionID id, Packet *packet) noexcept;
+		std::shared_ptr<Packet> alloc_packet(std::size_t payload_capacity = Packet::DEFAULT_PAYLOAD_CAPACITY) noexcept;
+		bool send_packet(SessionID id, std::shared_ptr<Packet> packet) noexcept;
 
 		utility::Logger *logger;
 

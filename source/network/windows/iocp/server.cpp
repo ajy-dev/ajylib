@@ -394,7 +394,30 @@ clean_wsa:
 		return this->calculate_tps(this->send_count, this->last_send_query, this->last_send_tps);
 	}
 
-	bool Server::send_packet(SessionID id, Packet *packet) noexcept
+	std::shared_ptr<Server::Packet> Server::alloc_packet(std::size_t payload_capacity) noexcept
+	{
+		std::shared_ptr<Packet> packet;
+
+		try
+		{
+			packet = std::make_shared<Packet>(payload_capacity);
+		}
+		catch (const std::bad_alloc &error)
+		{
+			this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): %s", error.what());
+			return nullptr;
+		}
+		
+		if (!packet->get_capacity())
+		{
+			this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): internal buffer allocation failed.");
+			return nullptr;
+		}
+
+		return packet;
+	}
+
+	bool Server::send_packet(SessionID id, std::shared_ptr<Packet> packet) noexcept
 	{
 		Session *session;
 		bool success;

@@ -26,12 +26,19 @@ bool EchoServer::on_connection_request(const char *ip, std::uint16_t port)
 void EchoServer::on_client_join(SessionID id) noexcept
 {
 	constexpr std::int64_t WELCOME_MAGIC = 0x7fffffffffffffff;
-	Packet welcome(sizeof(WELCOME_MAGIC));
+	std::shared_ptr<Packet> welcome;
 
 	this->logger->log(ajy::utility::Logger::LogLevel::Info, "client joined. id: %llu", id);
 
-	welcome << WELCOME_MAGIC;
-	this->send_packet(id, &welcome);
+	welcome = this->alloc_packet(sizeof(WELCOME_MAGIC));
+	if (!welcome)
+	{
+		this->logger->log(ajy::utility::Logger::LogLevel::Error, "on_client_join(): alloc_packet failed. id: %llu", id);
+		return;
+	}
+
+	*welcome << WELCOME_MAGIC;
+	this->send_packet(id, welcome);
 }
 
 void EchoServer::on_client_leave(SessionID id) noexcept
@@ -63,15 +70,22 @@ void EchoServer::on_recv(SessionID id, Packet *packet) noexcept
 	}
 	else
 	{
-		Packet reply(payload_size);
+		std::shared_ptr<Packet> reply;
 
-		if (!reply.serialize(payload.data(), payload_size))
+		reply = this->alloc_packet(payload_size);
+		if (!reply)
+		{
+			this->logger->log(ajy::utility::Logger::LogLevel::Error, "on_recv(): alloc_packet failed. id: %llu", id);
+			return;
+		}
+
+		if (!reply->serialize(payload.data(), payload_size))
 		{
 			this->logger->log(ajy::utility::Logger::LogLevel::Error, "on_recv(): serialize failed. id: %llu", id);
 			return;
 		}
 
-		this->send_packet(id, &reply);
+		this->send_packet(id, reply);
 	}
 }
 
