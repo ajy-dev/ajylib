@@ -61,6 +61,7 @@ target_sources(
 		source/utility/console.cpp
 		source/network/server_console_commands.cpp
 		source/network/protocol/packet_buffer.cpp
+		source/network/protocol/obfuscator/obfuscator.cpp
 		$<$<PLATFORM_ID:Windows>:source/io/windows/output_device.cpp>
 		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/server.cpp>
 	PUBLIC
@@ -83,6 +84,7 @@ target_sources(
 			include/ajy/network/server.hpp
 			include/ajy/network/server_console_commands.hpp
 			include/ajy/network/protocol/packet_buffer.hpp
+			include/ajy/network/protocol/obfuscator/obfuscator.hpp
 			$<$<PLATFORM_ID:Windows>:include/ajy/io/windows/output_device.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/windows.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/network/windows/iocp/server.hpp>
