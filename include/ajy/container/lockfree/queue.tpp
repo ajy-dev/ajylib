@@ -192,6 +192,9 @@ namespace ajy::container::lockfree
 			old_tail_ptr = this->unpack_ptr(old_tail_raw);
 			next_raw = old_tail_ptr->next.load(std::memory_order_acquire);
 
+			if (old_tail_raw != this->tail.load(std::memory_order_acquire))
+				continue;
+
 			if (!this->unpack_ptr(next_raw))
 			{
 				std::uintptr_t new_next_raw;
