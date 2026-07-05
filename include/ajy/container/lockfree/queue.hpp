@@ -11,7 +11,7 @@
  * 	Requires a 64-bit platform with 48-bit canonical addresses.
  * Author: ajy-dev
  * Created: 2026-06-16
- * Updated: Never
+ * Updated: 2026-07-06
  * Version: 0.1.0
  */
 
@@ -47,6 +47,8 @@ namespace ajy::container::lockfree
 		bool enqueue(const T &value) noexcept(std::is_nothrow_copy_constructible<T>::value);
 
 		std::optional<T> dequeue(void) noexcept(std::is_nothrow_copy_constructible<T>::value);
+
+		bool is_empty(void) const noexcept;
 
 	private:
 		struct Node

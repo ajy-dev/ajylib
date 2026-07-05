@@ -5,7 +5,7 @@
  * 	A Michael-Scott style lockfree queue definition.
  * Author: ajy-dev
  * Created: 2026-06-16
- * Updated: 2026-07-05
+ * Updated: 2026-07-06
  * Version: 0.1.0
  */
 
@@ -127,6 +127,27 @@ namespace ajy::container::lockfree
 					return ret;
 				}
 			}
+		}
+	}
+
+	template <std::copy_constructible T>
+	bool Queue<T>::is_empty(void) const noexcept
+	{
+		while (true)
+		{
+			std::uintptr_t head_raw;
+			Node *head_ptr;
+			std::uintptr_t next_raw;
+
+			head_raw = this->head.load(std::memory_order_acquire);
+			head_ptr = this->unpack_ptr(head_raw);
+
+			if (!head_ptr)
+				return true;
+			
+			next_raw = head_ptr->next.load(std::memory_order_acquire);
+			if (head_raw == this->head.load(std::memory_order_acquire))
+				return unpack_ptr(next_raw) == nullptr;
 		}
 	}
 
