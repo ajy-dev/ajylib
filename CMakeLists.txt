@@ -79,7 +79,7 @@ target_sources(
 			include/ajy/io/output_device.hpp
 			include/ajy/io/stdio/output_device.hpp
 			include/ajy/utility/logger.hpp
-			include/ajy/utility/console.hpp 
+			include/ajy/utility/console.hpp
 			include/ajy/network/server.hpp
 			include/ajy/network/server_console_commands.hpp
 			include/ajy/network/protocol/packet_buffer.hpp
@@ -101,9 +101,14 @@ set_target_properties(
 	MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 
+add_library(
+	ajylib_build_options
+	INTERFACE
+)
+
 target_compile_options(
-	ajylib
-	PRIVATE
+	ajylib_build_options
+	INTERFACE
 		# MSVC Common
 		$<$<CXX_COMPILER_ID:MSVC>:/W4>
 		$<$<CXX_COMPILER_ID:MSVC>:/permissive->
@@ -152,8 +157,8 @@ target_compile_options(
 )
 
 target_compile_definitions(
-	ajylib
-	PRIVATE
+	ajylib_build_options
+	INTERFACE
 		$<$<NOT:$<CONFIG:Debug>>:NDEBUG>
 		$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
 )
@@ -162,6 +167,8 @@ target_link_libraries(
 	ajylib
 	PUBLIC
 		$<$<PLATFORM_ID:Windows>:ws2_32>
+	PRIVATE
+		ajylib_build_options
 )
 
 set_source_files_properties(
@@ -170,7 +177,7 @@ set_source_files_properties(
 	source/network/windows/iocp/server.cpp
 	PROPERTIES
 	COMPILE_OPTIONS
-	$<$<CXX_COMPILER_ID:MSVC>:/wd4458>
+		$<$<CXX_COMPILER_ID:MSVC>:/wd4458>
 )
 
 option(

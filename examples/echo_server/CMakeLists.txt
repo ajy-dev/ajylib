@@ -11,4 +11,5 @@ target_link_libraries(
 	echo_server
 	PRIVATE
 		ajylib
+		ajylib_build_options
 )
