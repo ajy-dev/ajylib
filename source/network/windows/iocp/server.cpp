@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server definition.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-04
+ * Updated: 2026-07-06
  * Version: 0.1.0
  */
 
@@ -370,6 +370,8 @@ clean_wsa:
 		session->disconnect_flag.store(true, std::memory_order_relaxed);
 		::CancelIoEx(reinterpret_cast<HANDLE>(session->socket), nullptr);
 
+		this->logger->log(utility::Logger::LogLevel::Info, "Force disconnect id: %llu", id);
+
 		this->release_session(session);
 		return true;
 	}
@@ -457,7 +459,10 @@ clean_wsa:
 				success = true;
 			}
 			else
-				this->logger->log(utility::Logger::LogLevel::Error, "send_packet(): send_buffer full. id: %llu", id);
+			{
+				this->logger->log(utility::Logger::LogLevel::Warning, "send_packet(): send_buffer full. id: %llu", id);
+				this->disconnect(id);
+			}
 		}
 		catch (const std::system_error &error)
 		{
@@ -805,7 +810,8 @@ clean_wsa:
 		total_free = session->recv_buffer.get_free_size();
 		if (!total_free)
 		{
-			this->logger->log(utility::Logger::LogLevel::Error, "recv_post(): recv_buffer is full. id: %llu", id);
+			this->logger->log(utility::Logger::LogLevel::Warning, "recv_post(): recv_buffer is full. Id: %llu", id);
+			this->disconnect(id);
 			return false;
 		}
 
