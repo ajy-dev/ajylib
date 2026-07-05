@@ -151,6 +151,8 @@ namespace ajy::network::windows::iocp
 		{
 			this->sessions[i].index = i;
 			this->sessions[i].socket = INVALID_SOCKET;
+			this->sessions[i].pending_send_count.store(0, std::memory_order_relaxed);
+			this->sessions[i].in_flight_offset = 0;
 			if (!this->free_indices.push(i))
 			{
 				this->logger->log(utility::Logger::LogLevel::Error, "free_indices.push() failed at index %u", i);
@@ -169,6 +171,7 @@ namespace ajy::network::windows::iocp
 		this->last_accept_query.store(ServerClock::now(), std::memory_order_relaxed);
 		this->last_recv_query.store(ServerClock::now(), std::memory_order_relaxed);
 		this->last_send_query.store(ServerClock::now(), std::memory_order_relaxed);
+		this->max_pending_sends.store(DEFAULT_MAX_PENDING_SENDS, std::memory_order_relaxed);
 		this->running.store(true, std::memory_order_release);
 
 		try
@@ -409,7 +412,7 @@ clean_wsa:
 			this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): %s", error.what());
 			return nullptr;
 		}
-		
+
 		if (!packet->get_capacity())
 		{
 			this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): internal buffer allocation failed.");
@@ -422,7 +425,9 @@ clean_wsa:
 	bool Server::send_packet(SessionID id, std::shared_ptr<Packet> packet) noexcept
 	{
 		Session *session;
-		bool success;
+		std::shared_ptr<const Packet> finalized_packet;
+		std::uint16_t limit;
+		std::uint16_t count;
 
 		if (!packet)
 		{
@@ -440,42 +445,36 @@ clean_wsa:
 			return false;
 
 		packet->build_header();
-		success = false;
+		finalized_packet = packet;
 
-		try
+		limit = this->max_pending_sends.load(std::memory_order_relaxed);
+		count = session->pending_send_count.load(std::memory_order_relaxed);
+		while (count < limit)
+			if (session->pending_send_count.compare_exchange_weak(count, count + 1, std::memory_order_relaxed))
+				break;
+
+		if (count >= limit)
 		{
-			std::lock_guard<std::mutex> lock(session->lock);
-
-			if (session->send_buffer.get_free_size() >= packet->get_packet_size())
-			{
-				session->send_buffer.write(packet->get_buffer_ptr(), packet->get_packet_size());
-
-				this->send_count.fetch_add(1, std::memory_order_relaxed);
-
-				if (!session->send_flag.exchange(true, std::memory_order_relaxed))
-					if (!this->send_post(session))
-						session->send_flag.store(false, std::memory_order_relaxed);
-
-				success = true;
-			}
-			else
-			{
-				this->logger->log(utility::Logger::LogLevel::Warning, "send_packet(): send_buffer full. id: %llu", id);
-				this->disconnect(id);
-			}
+			this->logger->log(utility::Logger::LogLevel::Warning, "send_packet(): pending_sends full, disconnecting. id: %llu", id);
+			this->disconnect(id);
+			this->release_session(session);
+			return false;
 		}
-		catch (const std::system_error &error)
+
+		if (!session->pending_sends.enqueue(std::move(finalized_packet)))
 		{
-			this->logger->log(
-				utility::Logger::LogLevel::Fatal,
-				"std::lock_guard(session->lock): [Code: %d] %s",
-				error.code().value(),
-				error.what());
-			std::terminate();
+			this->logger->log(utility::Logger::LogLevel::Error, "send_packet(): pending_sends.enqueue() failed. id: %llu", id);
+			session->pending_send_count.fetch_sub(1, std::memory_order_relaxed);
+			this->release_session(session);
+			return false;
 		}
+
+		this->send_count.fetch_add(1, std::memory_order_relaxed);
+
+		this->send_post(session);
 
 		this->release_session(session);
-		return success;
+		return true;
 	}
 
 	void Server::accept_thread_proc(Server *server) noexcept
@@ -650,29 +649,30 @@ clean_wsa:
 			}
 			else if (overlapped == &session->send_overlapped)
 			{
-				try
+				DWORD remaining;
+
+				remaining = bytes_transferred;
+				while (remaining && !session->in_flight_packets.empty())
 				{
-					std::lock_guard<std::mutex> lock(session->lock);
+					std::size_t first_size;
 
-					session->send_buffer.commit_direct_read(bytes_transferred);
-
-					if (session->send_buffer.get_used_size())
+					first_size = session->in_flight_packets.front()->get_packet_size() - session->in_flight_offset;
+					if (remaining >= first_size)
 					{
-						if (!server->send_post(session))
-							session->send_flag.store(false, std::memory_order_relaxed);
+						remaining -= static_cast<DWORD>(first_size);
+						session->in_flight_packets.pop_front();
+						session->in_flight_offset = 0;
+						session->pending_send_count.fetch_sub(1, std::memory_order_relaxed);
 					}
 					else
-						session->send_flag.store(false, std::memory_order_relaxed);
+					{
+						session->in_flight_offset += remaining;
+						remaining = 0;
+					}
 				}
-				catch (const std::system_error &error)
-				{
-					server->logger->log(
-						utility::Logger::LogLevel::Fatal,
-						"std::lock_guard(session->lock): [Code: %d] %s",
-						error.code().value(),
-						error.what());
-					std::terminate();
-				}
+
+				session->send_flag.store(false, std::memory_order_release);
+				server->send_post(session);
 
 				server->on_send(id, static_cast<std::size_t>(bytes_transferred));
 			}
@@ -783,7 +783,11 @@ clean_wsa:
 
 			session->generation.fetch_add(1, std::memory_order_relaxed);
 			session->recv_buffer.clear();
-			session->send_buffer.clear();
+			while (session->pending_sends.dequeue().has_value())
+				;
+			session->in_flight_packets.clear();
+			session->in_flight_offset = 0;
+			session->pending_send_count.store(0, std::memory_order_relaxed);
 			session->send_flag.store(false, std::memory_order_relaxed);
 			session->disconnect_flag.store(false, std::memory_order_relaxed);
 
@@ -859,64 +863,122 @@ clean_wsa:
 		return true;
 	}
 
-	bool Server::send_post(Session *session) noexcept
+	void Server::send_post(Session *session) noexcept
 	{
-		WSABUF wsabuf[2];
+		WSABUF wsabuf[SEND_BATCH_SIZE];
+		std::size_t wsabuf_count;
 		DWORD flags;
 		DWORD send_bytes;
-		std::size_t total_used;
-		std::size_t first;
-		std::size_t second;
 		SessionID id;
 
+		if (session->send_flag.exchange(true, std::memory_order_acq_rel))
+			return;
+
 		id = this->pack_session_id(session->index, session->generation.load(std::memory_order_relaxed));
-		total_used = session->send_buffer.get_used_size();
-		if (!total_used)
-			return false;
 
-		first = session->send_buffer.get_direct_read_size();
-		second = total_used - first;
-
-		wsabuf[0].buf = static_cast<char *>(session->send_buffer.get_direct_read_ptr());
-		wsabuf[0].len = static_cast<ULONG>(first);
-		wsabuf[1].buf = wsabuf[0].buf - (session->send_buffer.get_capacity() - first);
-		wsabuf[1].len = static_cast<ULONG>(second);
-
-		flags = 0;
-		send_bytes = 0;
-		std::memset(&session->send_overlapped, 0, sizeof(OVERLAPPED));
-
-		if (session->disconnect_flag.load(std::memory_order_relaxed))
-			return false;
-
-		if (!this->acquire_session(id))
-			return false;
-
-		if (::WSASend(session->socket, wsabuf, second ? 2 : 1, &send_bytes, flags, &session->send_overlapped, nullptr) == SOCKET_ERROR)
+		while (true)
 		{
-			int error_code;
-
-			error_code = ::WSAGetLastError();
-			if (error_code != WSA_IO_PENDING)
+			if (session->in_flight_packets.empty())
 			{
-				utility::Logger::LogLevel level;
+				std::optional<std::shared_ptr<const Packet>> dequeued;
+				std::size_t drained;
 
-				switch (error_code)
+				drained = 0;
+				while (drained < SEND_BATCH_SIZE && (dequeued = session->pending_sends.dequeue()).has_value())
 				{
-				case WSAECONNRESET:
-					level = utility::Logger::LogLevel::Debug;
-					break;
-				default:
-					level = utility::Logger::LogLevel::Error;
-					break;
+					try
+					{
+						session->in_flight_packets.push_back(std::move(dequeued.value()));
+					}
+					catch (const std::bad_alloc &error)
+					{
+						this->logger->log(
+							utility::Logger::LogLevel::Fatal,
+							"std::deque::push_back(in_flight_packets): %s",
+							error.what());
+						std::terminate();
+					}
+					++drained;
 				}
-				this->log_winapi_error("WSASend()", error_code, level);
-				this->release_session(session);
-				return false;
+				session->in_flight_offset = 0;
 			}
-		}
 
-		return true;
+			if (session->in_flight_packets.empty())
+			{
+				session->send_flag.store(false, std::memory_order_release);
+
+				if (session->pending_sends.is_empty())
+					return;
+				if (session->send_flag.exchange(true, std::memory_order_acq_rel))
+					return;
+
+				continue;
+			}
+
+			wsabuf_count = 0;
+			for (std::size_t i = 0; i < session->in_flight_packets.size(); ++i, ++wsabuf_count)
+			{
+				const Packet *current;
+				const std::byte *buffer_ptr;
+				std::size_t packet_size;
+
+				current = session->in_flight_packets[i].get();
+				buffer_ptr = static_cast<const std::byte *>(current->get_buffer_ptr());
+				packet_size = current->get_packet_size();
+
+				if (!i)
+				{
+					buffer_ptr += session->in_flight_offset;
+					packet_size -= session->in_flight_offset;
+				}
+
+				wsabuf[wsabuf_count].buf = const_cast<char *>(reinterpret_cast<const char *>(buffer_ptr));
+				wsabuf[wsabuf_count].len = static_cast<ULONG>(packet_size);
+			}
+
+			flags = 0;
+			send_bytes = 0;
+			std::memset(&session->send_overlapped, 0, sizeof(OVERLAPPED));
+
+			if (session->disconnect_flag.load(std::memory_order_relaxed))
+			{
+				session->send_flag.store(false, std::memory_order_release);
+				return;
+			}
+
+			if (!this->acquire_session(id))
+			{
+				session->send_flag.store(false, std::memory_order_release);
+				return;
+			}
+
+			if (::WSASend(session->socket, wsabuf, static_cast<DWORD>(wsabuf_count), &send_bytes, flags, &session->send_overlapped, nullptr) == SOCKET_ERROR)
+			{
+				int error_code;
+
+				error_code = ::WSAGetLastError();
+				if (error_code != WSA_IO_PENDING)
+				{
+					utility::Logger::LogLevel level;
+
+					switch (error_code)
+					{
+					case WSAECONNRESET:
+						level = utility::Logger::LogLevel::Debug;
+						break;
+					default:
+						level = utility::Logger::LogLevel::Error;
+						break;
+					}
+					this->log_winapi_error("WSASend()", error_code, level);
+					this->release_session(session);
+					session->send_flag.store(false, std::memory_order_release);
+					return;
+				}
+			}
+
+			break;
+		}
 	}
 
 	void Server::log_winapi_error(const char *func_name, DWORD error_code, utility::Logger::LogLevel level) noexcept

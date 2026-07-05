@@ -5,13 +5,14 @@
  *	A Windows IOCP TCP server declaration.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-04
+ * Updated: 2026-07-06
  * Version: 0.1.0
  */
 
 #ifndef AJY_NETWORK_WINDOWS_IOCP_SERVER_HPP
 #define AJY_NETWORK_WINDOWS_IOCP_SERVER_HPP
 
+#include <ajy/container/lockfree/queue.hpp>
 #include <ajy/container/lockfree/stack.hpp>
 #include <ajy/container/ring_buffer.hpp>
 #include <ajy/network/protocol/packet_buffer.hpp>
@@ -22,6 +23,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -72,6 +74,10 @@ namespace ajy::network::windows::iocp
 		utility::Logger *logger;
 
 	private:
+		static constexpr std::uint16_t DEFAULT_MAX_PENDING_SENDS = 1024;
+		static constexpr std::size_t PENDING_SENDS_INITIAL_CAPACITY = 128;
+		static constexpr std::size_t SEND_BATCH_SIZE = 128;
+
 		struct Session
 		{
 			std::uint32_t index;
@@ -82,7 +88,11 @@ namespace ajy::network::windows::iocp
 			container::RingBuffer recv_buffer = container::RingBuffer(65535);
 
 			OVERLAPPED send_overlapped;
-			container::RingBuffer send_buffer = container::RingBuffer(65535);
+			container::lockfree::Queue<std::shared_ptr<const Packet>> pending_sends =
+				container::lockfree::Queue<std::shared_ptr<const Packet>>(PENDING_SENDS_INITIAL_CAPACITY);
+			std::atomic<std::uint16_t> pending_send_count;
+			std::deque<std::shared_ptr<const Packet>> in_flight_packets;
+			std::size_t in_flight_offset;
 
 			std::atomic<bool> send_flag;
 			std::atomic<bool> disconnect_flag;
@@ -107,7 +117,7 @@ namespace ajy::network::windows::iocp
 		void release_session(Session *session) noexcept;
 
 		bool recv_post(Session *session) noexcept;
-		bool send_post(Session *session) noexcept;
+		void send_post(Session *session) noexcept;
 
 		void log_winapi_error(const char *func_name, DWORD error_code, utility::Logger::LogLevel level = utility::Logger::LogLevel::Error) noexcept;
 
@@ -115,6 +125,7 @@ namespace ajy::network::windows::iocp
 		SOCKET listen_socket;
 		std::atomic<bool> running;
 		std::uint32_t max_sessions;
+		std::atomic<std::uint16_t> max_pending_sends;
 
 		std::thread accept_thread;
 		std::vector<std::thread> worker_threads;
