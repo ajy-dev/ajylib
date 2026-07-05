@@ -5,7 +5,7 @@
  * 	A Michael-Scott style lockfree queue definition.
  * Author: ajy-dev
  * Created: 2026-06-16
- * Updated: Never
+ * Updated: 2026-07-05
  * Version: 0.1.0
  */
 
@@ -90,20 +90,35 @@ namespace ajy::container::lockfree
 		while (true)
 		{
 			std::uintptr_t old_head_raw;
-			Node *old_head_ptr;
+			std::uintptr_t old_tail_raw;
 			std::uintptr_t next_raw;
+			Node *old_head_ptr;
 			Node *next_ptr;
 
 			old_head_raw = this->head.load(std::memory_order_acquire);
+			old_tail_raw = this->tail.load(std::memory_order_acquire);
 			old_head_ptr = this->unpack_ptr(old_head_raw);
 			next_raw = old_head_ptr->next.load(std::memory_order_acquire);
 			next_ptr = this->unpack_ptr(next_raw);
 
-			if (next_ptr)
+			if (old_head_raw != this->head.load(std::memory_order_acquire))
+				continue;
+
+			if (old_head_ptr == this->unpack_ptr(old_tail_raw))
+			{
+				std::uintptr_t new_tail_raw;
+
+				if (!next_ptr)
+					return std::nullopt;
+
+				new_tail_raw = this->pack(next_ptr, this->unpack_tag(old_tail_raw) + 1);
+				this->tail.compare_exchange_strong(old_tail_raw, new_tail_raw, std::memory_order_release, std::memory_order_relaxed);
+			}
+			else
 			{
 				std::uintptr_t new_head_raw;
 				std::optional<T> ret(next_ptr->data);
-				
+
 				new_head_raw = this->pack(next_ptr, this->unpack_tag(old_head_raw) + 1);
 
 				if (this->head.compare_exchange_weak(old_head_raw, new_head_raw, std::memory_order_acquire, std::memory_order_relaxed))
@@ -112,10 +127,6 @@ namespace ajy::container::lockfree
 					return ret;
 				}
 			}
-			else
-				return std::nullopt;
-
-
 		}
 	}
 
