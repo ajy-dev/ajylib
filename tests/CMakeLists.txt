@@ -24,6 +24,7 @@ target_sources(
 		memory/threadlocal/memory_pool_test.cpp
 		io/stdio/output_device_test.cpp
 		utility/logger_test.cpp
+		network/protocol/obfuscator/obfuscator_test.cpp
 		$<$<PLATFORM_ID:Windows>:io/windows/output_device_test.cpp>
 )
 
