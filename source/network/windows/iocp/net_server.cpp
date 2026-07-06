@@ -625,6 +625,11 @@ clean_wsa:
 
 						if (static_cast<std::uint8_t>(header[Packet::CODE_OFFSET]) != server->code)
 						{
+							server->logger->log(utility::Logger::LogLevel::Warning,
+								"Recv code mismatch: got=0x%02X want=0x%02X id=%llu",
+								static_cast<unsigned>(static_cast<std::uint8_t>(header[Packet::CODE_OFFSET])),
+								static_cast<unsigned>(server->code),
+								id);
 							desync = true;
 							break;
 						}
@@ -638,7 +643,7 @@ clean_wsa:
 						session->recv_buffer.commit_direct_read(Packet::HEADER_SIZE);
 
 						packets.push_back(std::make_unique<Packet>(payload_length));
-						packets.back()->set_header(&payload_length);
+						packets.back()->set_header(header);
 						session->recv_buffer.read(packets.back()->get_payload_ptr(), payload_length);
 						packets.back()->commit_direct_serialize(payload_length);
 					}
@@ -665,6 +670,7 @@ clean_wsa:
 				{
 					if (!packet->decode(server->fixed_key))
 					{
+						server->logger->log(utility::Logger::LogLevel::Warning, "Recv decode/checksum failed: id=%llu", id);
 						server->disconnect(id);
 						disconnected = true;
 						break;
