@@ -61,6 +61,7 @@ target_sources(
 		source/utility/console.cpp
 		source/utility/monitor/probe.cpp
 		source/utility/monitor/monitor.cpp
+		source/utility/monitor/monitor_console_commands.cpp
 		source/network/server_console_commands.cpp
 		source/network/protocol/packet_buffer.cpp
 		source/network/protocol/net_packet_buffer.cpp
@@ -89,6 +90,7 @@ target_sources(
 			include/ajy/utility/console.hpp
 			include/ajy/utility/monitor/probe.hpp
 			include/ajy/utility/monitor/monitor.hpp
+			include/ajy/utility/monitor/monitor_console_commands.hpp
 			include/ajy/network/server.hpp
 			include/ajy/network/server_console_commands.hpp
 			include/ajy/network/protocol/packet_buffer.hpp
