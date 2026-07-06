@@ -65,6 +65,7 @@ target_sources(
 		source/network/protocol/obfuscator/obfuscator.cpp
 		$<$<PLATFORM_ID:Windows>:source/io/windows/output_device.cpp>
 		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/server.cpp>
+		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/net_server.cpp>
 	PUBLIC
 		FILE_SET HEADERS
 		BASE_DIRS include
@@ -90,6 +91,7 @@ target_sources(
 			$<$<PLATFORM_ID:Windows>:include/ajy/io/windows/output_device.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/windows.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/network/windows/iocp/server.hpp>
+			$<$<PLATFORM_ID:Windows>:include/ajy/network/windows/iocp/net_server.hpp>
 )
 
 target_compile_features(
@@ -179,6 +181,7 @@ set_source_files_properties(
 	source/container/ring_buffer.cpp
 	source/io/windows/output_device.cpp
 	source/network/windows/iocp/server.cpp
+	source/network/windows/iocp/net_server.cpp
 	PROPERTIES
 	COMPILE_OPTIONS
 		$<$<CXX_COMPILER_ID:MSVC>:/wd4458>
