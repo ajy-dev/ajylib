@@ -5,7 +5,7 @@
  *	A Windows IOCP obfuscated-protocol TCP server definition.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: Never
+ * Updated: 2026-07-06
  * Version: 0.1.0
  */
 
@@ -18,6 +18,7 @@
 #include <cstring>
 #include <exception>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <new>
 #include <optional>
@@ -598,7 +599,7 @@ clean_wsa:
 
 			if (overlapped == &session->recv_overlapped)
 			{
-				std::vector<Packet> packets;
+				std::vector<std::unique_ptr<Packet>> packets;
 				bool desync;
 				bool disconnected;
 
@@ -636,10 +637,10 @@ clean_wsa:
 
 						session->recv_buffer.commit_direct_read(Packet::HEADER_SIZE);
 
-						packets.emplace_back(payload_length);
-						packets.back().set_header(header);
-						session->recv_buffer.read(packets.back().get_payload_ptr(), payload_length);
-						packets.back().commit_direct_serialize(payload_length);
+						packets.push_back(std::make_unique<Packet>(payload_length));
+						packets.back()->set_header(&payload_length);
+						session->recv_buffer.read(packets.back()->get_payload_ptr(), payload_length);
+						packets.back()->commit_direct_serialize(payload_length);
 					}
 				}
 				catch (const std::system_error &error)
@@ -655,21 +656,21 @@ clean_wsa:
 				{
 					server->logger->log(
 						utility::Logger::LogLevel::Fatal,
-						"std::vector::emplace_back(packets): %s",
+						"std::make_unique<Packet>(packets): %s",
 						error.what());
 					std::terminate();
 				}
 
-				for (Packet &packet : packets)
+				for (std::unique_ptr<Packet> &packet : packets)
 				{
-					if (!packet.decode(server->fixed_key))
+					if (!packet->decode(server->fixed_key))
 					{
 						server->disconnect(id);
 						disconnected = true;
 						break;
 					}
 					server->recv_count.fetch_add(1, std::memory_order_relaxed);
-					server->on_recv(id, &packet);
+					server->on_recv(id, std::move(packet));
 				}
 
 				if (desync && !disconnected)

@@ -5,7 +5,7 @@
  *	A minimal echo server built on ajy::network::windows::iocp::Server.
  * Author: ajy-dev
  * Created: 2026-07-02
- * Updated: 2026-07-04
+ * Updated: 2026-07-06
  * Version: 0.1.0
  */
 
@@ -46,7 +46,7 @@ void EchoServer::on_client_leave(SessionID id) noexcept
 	this->logger->log(ajy::utility::Logger::LogLevel::Info, "client left. id: %llu", id);
 }
 
-void EchoServer::on_recv(SessionID id, Packet *packet) noexcept
+void EchoServer::on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
 {
 	std::vector<std::byte> payload;
 	std::size_t payload_size;

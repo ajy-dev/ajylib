@@ -5,7 +5,7 @@
  *	A minimal echo server built on ajy::network::windows::iocp::Server.
  * Author: ajy-dev
  * Created: 2026-07-02
- * Updated: 2026-07-04
+ * Updated: 2026-07-06
  * Version: 0.1.0
  */
 
@@ -16,6 +16,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 class EchoServer : public ajy::network::windows::iocp::Server
 {
@@ -26,7 +27,7 @@ protected:
 	bool on_connection_request(const char *ip, std::uint16_t port) override;
 	void on_client_join(SessionID id) noexcept override;
 	void on_client_leave(SessionID id) noexcept override;
-	void on_recv(SessionID id, Packet *packet) noexcept override;
+	void on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept override;
 	void on_send(SessionID id, std::size_t size) noexcept override;
 	void on_worker_thread_begin(void) noexcept override;
 	void on_worker_thread_end(void) noexcept override;

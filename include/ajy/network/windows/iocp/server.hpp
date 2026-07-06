@@ -63,7 +63,7 @@ namespace ajy::network::windows::iocp
 		virtual bool on_connection_request(const char *ip, std::uint16_t port) = 0;
 		virtual void on_client_join(SessionID id) noexcept = 0;
 		virtual void on_client_leave(SessionID id) noexcept = 0;
-		virtual void on_recv(SessionID id, Packet *packet) noexcept = 0;
+		virtual void on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept = 0;
 		virtual void on_send(SessionID id, std::size_t size) noexcept = 0;
 		virtual void on_worker_thread_begin(void) noexcept = 0;
 		virtual void on_worker_thread_end(void) noexcept = 0;
