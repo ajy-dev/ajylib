@@ -13,9 +13,16 @@
  * 	time, and the random key travels in the header. CheckSum is the low byte
  * 	of the payload byte sum and is the decode-success test, since the cipher
  * 	gives no intrinsic failure signal.
+ * 	finalized is a plain (non-atomic) flag that makes build_header/encode
+ * 	idempotent: the first call finalizes the packet, later calls are no-ops,
+ * 	so one packet can be broadcast to many sessions without re-encoding. A
+ * 	packet destined to be shared across threads must be finalized by a single
+ * 	thread before it is shared; afterwards it is immutable and may be passed
+ * 	between threads freely. Finalizing concurrently from multiple threads is a
+ * 	data race. If a packet is pooled and reused, finalized must be reset.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: Never
+ * Updated: 2026-07-06
  * Version: 0.1.0
  */
 
@@ -55,11 +62,13 @@ namespace ajy::network::protocol
 		void set_header(const void *header_bytes) noexcept;
 
 		std::size_t get_packet_size(void) const noexcept;
-		
+
 		const void *get_payload_ptr(void) const noexcept;
 		void *get_payload_ptr(void) noexcept;
 
 	private:
+		bool finalized;
+
 		static std::uint8_t compute_checksum(const void *payload, std::size_t length) noexcept;
 	};
 }

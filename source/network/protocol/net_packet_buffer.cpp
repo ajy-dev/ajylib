@@ -5,7 +5,7 @@
  *	A 5-byte-header obfuscated packet buffer definition.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: Never
+ * Updated: 2026-07-06
  * Version: 0.1.0
  */
 
@@ -19,6 +19,7 @@ namespace ajy::network::protocol
 {
 	NetPacketBuffer::NetPacketBuffer(std::size_t payload_capacity) noexcept
 		: SerializationBuffer(HEADER_SIZE + std::min(payload_capacity, MAX_PAYLOAD_SIZE))
+		, finalized(false)
 	{
 		this->commit_direct_serialize(HEADER_SIZE);
 		this->commit_direct_deserialize(HEADER_SIZE);
@@ -29,6 +30,9 @@ namespace ajy::network::protocol
 		std::byte *header;
 		std::uint16_t payload_length;
 		std::uint8_t checksum;
+
+		if (this->finalized)
+			return;
 
 		header = static_cast<std::byte *>(this->get_buffer_ptr());
 		payload_length = static_cast<std::uint16_t>(this->get_data_size());
@@ -46,11 +50,16 @@ namespace ajy::network::protocol
 		std::uint8_t random_key;
 		std::size_t block_length;
 
+		if (this->finalized)
+			return;
+
 		header = static_cast<std::byte *>(this->get_buffer_ptr());
 		std::memcpy(&random_key, header + RANDKEY_OFFSET, RANDKEY_SIZE);
 		block_length = CHECKSUM_SIZE + this->get_data_size();
 
 		obfuscator::obfuscate(header + CHECKSUM_OFFSET, block_length, fixed_key, random_key);
+
+		this->finalized = true;
 	}
 
 	bool NetPacketBuffer::decode(std::uint8_t fixed_key) noexcept
