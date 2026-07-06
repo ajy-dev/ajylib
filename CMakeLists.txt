@@ -59,6 +59,8 @@ target_sources(
 		source/io/stdio/output_device.cpp
 		source/utility/logger.cpp
 		source/utility/console.cpp
+		source/utility/monitor/probe.cpp
+		source/utility/monitor/monitor.cpp
 		source/network/server_console_commands.cpp
 		source/network/protocol/packet_buffer.cpp
 		source/network/protocol/net_packet_buffer.cpp
@@ -66,6 +68,8 @@ target_sources(
 		$<$<PLATFORM_ID:Windows>:source/io/windows/output_device.cpp>
 		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/server.cpp>
 		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/net_server.cpp>
+		$<$<PLATFORM_ID:Windows>:source/utility/monitor/windows/cpu_probe.cpp>
+		$<$<PLATFORM_ID:Windows>:source/utility/monitor/windows/memory_probe.cpp>
 	PUBLIC
 		FILE_SET HEADERS
 		BASE_DIRS include
@@ -83,6 +87,8 @@ target_sources(
 			include/ajy/io/stdio/output_device.hpp
 			include/ajy/utility/logger.hpp
 			include/ajy/utility/console.hpp
+			include/ajy/utility/monitor/probe.hpp
+			include/ajy/utility/monitor/monitor.hpp
 			include/ajy/network/server.hpp
 			include/ajy/network/server_console_commands.hpp
 			include/ajy/network/protocol/packet_buffer.hpp
@@ -90,6 +96,8 @@ target_sources(
 			include/ajy/network/protocol/obfuscator/obfuscator.hpp
 			$<$<PLATFORM_ID:Windows>:include/ajy/io/windows/output_device.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/windows.hpp>
+			$<$<PLATFORM_ID:Windows>:include/ajy/utility/monitor/windows/cpu_probe.hpp>
+			$<$<PLATFORM_ID:Windows>:include/ajy/utility/monitor/windows/memory_probe.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/network/windows/iocp/server.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/network/windows/iocp/net_server.hpp>
 )
@@ -173,6 +181,7 @@ target_link_libraries(
 	ajylib
 	PUBLIC
 		$<$<PLATFORM_ID:Windows>:ws2_32>
+		$<$<PLATFORM_ID:Windows>:Psapi>
 	PRIVATE
 		ajylib_build_options
 )

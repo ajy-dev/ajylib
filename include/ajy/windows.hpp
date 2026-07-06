@@ -20,8 +20,11 @@
 # define NOMINMAX
 #endif
 
-#include <Windows.h>
+// clang-format off
 #include <Winsock2.h>
+#include <Windows.h>
 #include <WS2tcpip.h>
+#include <Psapi.h>
+// clang-format on
 
 #endif
