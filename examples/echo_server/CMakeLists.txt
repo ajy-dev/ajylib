@@ -5,6 +5,7 @@ target_sources(
 	PRIVATE
 		main.cpp
 		echo_server.cpp
+		monitor_reporter.cpp
 )
 
 target_link_libraries(

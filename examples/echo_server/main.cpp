@@ -9,18 +9,24 @@
  *	LOG_LEVEL below is hardcoded for quick editing.
  * Author: ajy-dev
  * Created: 2026-07-02
- * Updated: 2026-07-03
+ * Updated: 2026-07-07
  * Version: 0.1.0
  */
 
 #include "echo_server.hpp"
+#include "monitor_reporter.hpp"
 
 #include <ajy/network/server_console_commands.hpp>
 #include <ajy/utility/console.hpp>
 #include <ajy/utility/logger.hpp>
+#include <ajy/utility/monitor/monitor.hpp>
+#include <ajy/utility/monitor/monitor_console_commands.hpp>
+#include <ajy/utility/monitor/windows/cpu_probe.hpp>
+#include <ajy/utility/monitor/windows/memory_probe.hpp>
 
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 
 namespace
 {
@@ -42,13 +48,26 @@ int main(void)
 	logger = ajy::utility::Logger::get(logger_index);
 	logger->set_threshold(LOG_LEVEL);
 
+	ajy::utility::monitor::Monitor monitor;
+	monitor.add(std::make_unique<ajy::utility::monitor::windows::ProcessCpuProbe>("process_cpu"));
+	monitor.add(std::make_unique<ajy::utility::monitor::windows::ProcessPrivateMemoryProbe>("process_mem_mb"));
+	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemCpuProbe>("system_cpu"));
+	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemAvailableMemoryProbe>("system_available_mem_mb"));
+	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemNonpagedMemoryProbe>("system_nonpaged_mem_mb"));
+
 	EchoServer server("echo_server");
 	ajy::utility::Console console;
+	MonitorReporter reporter(monitor);
 
 	ajy::network::register_server_commands(&console, &server);
+	ajy::utility::monitor::register_monitor_commands(&console, &monitor);
+
+	reporter.start();
 
 	std::printf("EchoServer management console. Type 'help' for commands, 'exit' to quit.\n");
 	console.run();
+
+	reporter.stop();
 
 	return EXIT_SUCCESS;
 }

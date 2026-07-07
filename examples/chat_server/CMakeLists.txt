@@ -6,6 +6,7 @@ target_sources(
 	PRIVATE
 		single_thread/main.cpp
 		single_thread/chat_server.cpp
+		monitor_reporter.cpp
 )
 
 target_include_directories(
