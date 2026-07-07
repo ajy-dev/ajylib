@@ -5,7 +5,7 @@
  * 	A lockfree memory pool definition.
  * Author: ajy-dev
  * Created: 2026-06-16
- * Updated: 2026-06-28
+ * Updated: 2026-07-07
  * Version: 0.1.0
  */
 
@@ -61,7 +61,10 @@ namespace ajy::memory::lockfree
 
 		node = this->pop();
 		if (node)
+		{
+			this->in_use_count.fetch_add(1, std::memory_order_relaxed);
 			return reinterpret_cast<T *>(node);
+		}
 
 		try
 		{
@@ -77,6 +80,7 @@ namespace ajy::memory::lockfree
 			std::terminate();
 		}
 
+		this->in_use_count.fetch_add(1, std::memory_order_relaxed);
 		return reinterpret_cast<T *>(node);
 	}
 
@@ -88,6 +92,7 @@ namespace ajy::memory::lockfree
 		if (!ptr)
 			return;
 
+		this->in_use_count.fetch_sub(1, std::memory_order_relaxed);
 		node = reinterpret_cast<FreeNode *>(ptr);
 		this->push(node);
 	}
@@ -129,6 +134,12 @@ namespace ajy::memory::lockfree
 
 		ptr->~T();
 		this->free(ptr);
+	}
+
+	template <PoolableType T>
+	std::size_t MemoryPool<T>::get_in_use_count(void) const noexcept
+	{
+		return this->in_use_count.load(std::memory_order_relaxed);
 	}
 
 	template <PoolableType T>

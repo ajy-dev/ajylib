@@ -12,7 +12,7 @@
  * 	Requires a 64-bit platform with 48-bit canonical addresses.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: 2026-06-28
+ * Updated: 2026-07-07
  * Version: 0.1.0
  */
 
@@ -23,6 +23,7 @@
 #include <ajy/memory/lockfree/memory_pool.hpp>
 #include <ajy/memory/shared_types.hpp>
 
+#include <atomic>
 #include <cstddef>
 #include <mutex>
 #include <stack>
@@ -54,6 +55,8 @@ namespace ajy::memory::threadlocal
 
 		void destroy(T *ptr) noexcept(std::is_nothrow_destructible<T>::value)
 		requires std::destructible<T>;
+
+		std::size_t get_in_use_count(void) const noexcept;
 
 	private:
 		struct TLSSlot
@@ -104,6 +107,8 @@ namespace ajy::memory::threadlocal
 		std::size_t tls_index;
 		std::size_t max_size;
 		std::size_t batch_size;
+
+		std::atomic<std::size_t> in_use_count;
 	};
 }
 

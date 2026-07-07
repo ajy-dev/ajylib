@@ -10,7 +10,7 @@
  * 	Requires a 64-bit platform with 48-bit canonical addresses.
  * Author: ajy-dev
  * Created: 2026-06-16
- * Updated: 2026-06-16
+ * Updated: 2026-07-07
  * Version: 0.1.0
  */
 
@@ -52,6 +52,8 @@ namespace ajy::memory::lockfree
 		void destroy(T *ptr) noexcept(std::is_nothrow_destructible<T>::value)
 		requires std::destructible<T>;
 
+		std::size_t get_in_use_count(void) const noexcept;
+
 	private:
 		static_assert(sizeof(std::uintptr_t) == 8, "Requires 64-bit platform");
 
@@ -71,6 +73,7 @@ namespace ajy::memory::lockfree
 		std::size_t expand_size;
 		std::mutex expand_lock;
 		Chunk<T> *chunks;
+		std::atomic<std::size_t> in_use_count;
 	};
 }
 

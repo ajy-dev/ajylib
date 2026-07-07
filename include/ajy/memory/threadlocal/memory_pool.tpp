@@ -5,7 +5,7 @@
  * 	A thread-local memory pool definition.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: 2026-06-28
+ * Updated: 2026-07-07
  * Version: 0.1.0
  */
 
@@ -50,6 +50,8 @@ namespace ajy::memory::threadlocal
 	template <PoolableType T>
 	T *MemoryPool<T>::alloc(void) noexcept
 	{
+		FreeNode *node;
+
 		if (!this->has_tls_slot())
 		{
 			try
@@ -65,7 +67,11 @@ namespace ajy::memory::threadlocal
 		if (!this->tls_freelists[this->tls_index].head)
 			this->refill_tls_from_global();
 
-		return reinterpret_cast<T *>(this->pop());
+		node = this->pop();
+		if (node)
+			this->in_use_count.fetch_add(1, std::memory_order_relaxed);
+
+		return reinterpret_cast<T *>(node);
 	}
 
 	template <PoolableType T>
@@ -73,6 +79,8 @@ namespace ajy::memory::threadlocal
 	{
 		if (!ptr)
 			return;
+
+		this->in_use_count.fetch_sub(1, std::memory_order_relaxed);
 
 		if (!this->has_tls_slot())
 		{
@@ -130,6 +138,12 @@ namespace ajy::memory::threadlocal
 
 		ptr->~T();
 		this->free(ptr);
+	}
+
+	template <PoolableType T>
+	std::size_t MemoryPool<T>::get_in_use_count(void) const noexcept
+	{
+		return this->in_use_count.load(std::memory_order_relaxed);
 	}
 
 	template <PoolableType T>
