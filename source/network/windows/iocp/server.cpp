@@ -498,6 +498,15 @@ clean_wsa:
 				continue;
 			}
 
+			{
+				LINGER linger_option;
+
+				linger_option.l_onoff = 1;
+				linger_option.l_linger = 0;
+				if (::setsockopt(client_socket, SOL_SOCKET, SO_LINGER, reinterpret_cast<const char *>(&linger_option), sizeof(linger_option)) == SOCKET_ERROR)
+					server->log_winapi_error("setsockopt(SO_LINGER)", ::WSAGetLastError(), utility::Logger::LogLevel::Warning);
+			}
+
 			::inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
 			if (!server->on_connection_request(ip, ::ntohs(addr.sin_port)))
 			{
