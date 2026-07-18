@@ -15,7 +15,7 @@
  *	here for wire completeness.
  * Author: ajy-dev
  * Created: 2026-07-07
- * Updated: Never
+ * Updated: 2026-07-18
  * Version: 0.1.0
  */
 
@@ -134,8 +134,8 @@ enum class MonitorDataType : std::uint8_t
 	// --- Server computer (40-44) --- IN SCOPE: monitor samples its own host
 	MONITOR_CPU_TOTAL = 40,	// whole-processor CPU %
 	MONITOR_NONPAGED_MEMORY = 41, // nonpaged pool, MByte
-	MONITOR_NETWORK_RECV = 42, // network recv, KByte (deferred, out of deadline scope)
-	MONITOR_NETWORK_SEND = 43, // network send, KByte (deferred, out of deadline scope)
+	MONITOR_NETWORK_RECV = 42, // network recv, KByte
+	MONITOR_NETWORK_SEND = 43, // network send, KByte
 	MONITOR_AVAILABLE_MEMORY = 44, // available memory, MByte
 };
 

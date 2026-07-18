@@ -10,7 +10,7 @@
  *	below before constructing the sampler.
  * Author: ajy-dev
  * Created: 2026-07-07
- * Updated: Never
+ * Updated: 2026-07-18
  * Version: 0.1.0
  */
 
@@ -35,6 +35,8 @@ public:
 	static constexpr std::string_view PROBE_CPU = "system_cpu";
 	static constexpr std::string_view PROBE_NONPAGED = "system_nonpaged_mem_mb";
 	static constexpr std::string_view PROBE_AVAILABLE = "system_available_mem_mb";
+	static constexpr std::string_view PROBE_NETWORK_RECV = "system_network_recv_kbyte_per_sec";
+	static constexpr std::string_view PROBE_NETWORK_SEND = "system_network_send_kbyte_per_sec";
 
 	LocalSampler(ajy::utility::monitor::Monitor &monitor, MonitorServer &server) noexcept;
 	~LocalSampler(void) noexcept;

@@ -7,7 +7,7 @@
  *	grid and injects each value into the MonitorServer.
  * Author: ajy-dev
  * Created: 2026-07-07
- * Updated: Never
+ * Updated: 2026-07-18
  * Version: 0.1.0
  */
 
@@ -30,6 +30,8 @@ LocalSampler::LocalSampler(ajy::utility::monitor::Monitor &monitor, MonitorServe
 	this->bind_probe(PROBE_CPU, static_cast<std::uint8_t>(MonitorDataType::MONITOR_CPU_TOTAL));
 	this->bind_probe(PROBE_NONPAGED, static_cast<std::uint8_t>(MonitorDataType::MONITOR_NONPAGED_MEMORY));
 	this->bind_probe(PROBE_AVAILABLE, static_cast<std::uint8_t>(MonitorDataType::MONITOR_AVAILABLE_MEMORY));
+	this->bind_probe(PROBE_NETWORK_RECV, static_cast<std::uint8_t>(MonitorDataType::MONITOR_NETWORK_RECV));
+	this->bind_probe(PROBE_NETWORK_SEND, static_cast<std::uint8_t>(MonitorDataType::MONITOR_NETWORK_SEND));
 }
 
 LocalSampler::~LocalSampler(void) noexcept

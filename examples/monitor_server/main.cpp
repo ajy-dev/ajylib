@@ -9,7 +9,7 @@
  *	LOG_LEVEL below is hardcoded for quick editing.
  * Author: ajy-dev
  * Created: 2026-07-07
- * Updated: Never
+ * Updated: 2026-07-18
  * Version: 0.1.0
  */
 
@@ -23,6 +23,7 @@
 #include <ajy/utility/monitor/monitor_console_commands.hpp>
 #include <ajy/utility/monitor/windows/cpu_probe.hpp>
 #include <ajy/utility/monitor/windows/memory_probe.hpp>
+#include <ajy/utility/monitor/windows/network_probe.hpp>
 
 #include <cstdio>
 #include <cstdlib>
@@ -54,6 +55,8 @@ int main(void)
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemCpuProbe>(LocalSampler::PROBE_CPU));
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemAvailableMemoryProbe>(LocalSampler::PROBE_AVAILABLE));
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemNonpagedMemoryProbe>(LocalSampler::PROBE_NONPAGED));
+	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemNetworkRecvProbe>(LocalSampler::PROBE_NETWORK_RECV));
+	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemNetworkSendProbe>(LocalSampler::PROBE_NETWORK_SEND));
 
 	MonitorServer server("monitor_server");
 	ajy::utility::Console console;
