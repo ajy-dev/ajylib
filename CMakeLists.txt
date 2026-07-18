@@ -181,6 +181,12 @@ target_compile_definitions(
 		$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
 )
 
+target_link_options(
+	ajylib_build_options
+	INTERFACE
+		$<$<CXX_COMPILER_ID:MSVC>:/DEBUG:FULL>
+)
+
 target_link_libraries(
 	ajylib
 	PUBLIC
