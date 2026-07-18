@@ -71,6 +71,7 @@ target_sources(
 		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/net_server.cpp>
 		$<$<PLATFORM_ID:Windows>:source/utility/monitor/windows/cpu_probe.cpp>
 		$<$<PLATFORM_ID:Windows>:source/utility/monitor/windows/memory_probe.cpp>
+		$<$<PLATFORM_ID:Windows>:source/utility/monitor/windows/network_probe.cpp>
 	PUBLIC
 		FILE_SET HEADERS
 		BASE_DIRS include
@@ -100,6 +101,7 @@ target_sources(
 			$<$<PLATFORM_ID:Windows>:include/ajy/windows.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/utility/monitor/windows/cpu_probe.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/utility/monitor/windows/memory_probe.hpp>
+			$<$<PLATFORM_ID:Windows>:include/ajy/utility/monitor/windows/network_probe.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/network/windows/iocp/server.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/network/windows/iocp/net_server.hpp>
 )
@@ -184,6 +186,7 @@ target_link_libraries(
 	PUBLIC
 		$<$<PLATFORM_ID:Windows>:ws2_32>
 		$<$<PLATFORM_ID:Windows>:Psapi>
+		$<$<PLATFORM_ID:Windows>:iphlpapi>
 	PRIVATE
 		ajylib_build_options
 )

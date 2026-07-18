@@ -5,7 +5,7 @@
  *	A centralized Windows API include header.
  * Author: ajy-dev
  * Created: 2026-07-01
- * Updated: Never
+ * Updated: 2026-07-08
  * Version: 0.1.0
  */
 
@@ -24,6 +24,7 @@
 #include <Winsock2.h>
 #include <Windows.h>
 #include <WS2tcpip.h>
+#include <iphlpapi.h>
 #include <Psapi.h>
 // clang-format on
 
