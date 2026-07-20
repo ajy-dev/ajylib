@@ -5,7 +5,7 @@
  *	A 5-byte-header obfuscated packet buffer definition.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: 2026-07-06
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -87,6 +87,14 @@ namespace ajy::network::protocol
 	void NetPacketBuffer::set_header(const void *header_bytes) noexcept
 	{
 		std::memcpy(this->get_buffer_ptr(), header_bytes, HEADER_SIZE);
+	}
+
+	void NetPacketBuffer::clear(void) noexcept
+	{
+		SerializationBuffer::clear();
+		this->commit_direct_serialize(HEADER_SIZE);
+		this->commit_direct_deserialize(HEADER_SIZE);
+		this->finalized = false;
 	}
 
 	std::size_t NetPacketBuffer::get_packet_size(void) const noexcept

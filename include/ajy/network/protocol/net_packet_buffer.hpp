@@ -22,7 +22,7 @@
  * 	data race. If a packet is pooled and reused, finalized must be reset.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: 2026-07-06
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -60,6 +60,8 @@ namespace ajy::network::protocol
 		void encode(std::uint8_t fixed_key) noexcept;
 		bool decode(std::uint8_t fixed_key) noexcept;
 		void set_header(const void *header_bytes) noexcept;
+
+		void clear(void) noexcept;
 
 		std::size_t get_packet_size(void) const noexcept;
 

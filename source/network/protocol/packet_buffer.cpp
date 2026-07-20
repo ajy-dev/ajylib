@@ -5,7 +5,7 @@
  *	A fixed-header packet buffer definition.
  * Author: ajy-dev
  * Created: 2026-07-04
- * Updated: Never
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -34,6 +34,13 @@ namespace ajy::network::protocol
 	void PacketBuffer::set_header(const void *header_bytes) noexcept
 	{
 		std::memcpy(this->get_buffer_ptr(), header_bytes, HEADER_SIZE);
+	}
+
+	void PacketBuffer::clear(void) noexcept
+	{
+		SerializationBuffer::clear();
+		this->commit_direct_serialize(HEADER_SIZE);
+		this->commit_direct_deserialize(HEADER_SIZE);
 	}
 
 	std::size_t PacketBuffer::get_packet_size(void) const noexcept

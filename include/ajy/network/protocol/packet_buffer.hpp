@@ -10,7 +10,7 @@
  *	2-byte header, since a larger payload could never be described by it.
  * Author: ajy-dev
  * Created: 2026-07-04
- * Updated: Never
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -36,6 +36,8 @@ namespace ajy::network::protocol
 
 		void build_header(void) noexcept;
 		void set_header(const void *header_bytes) noexcept;
+
+		void clear(void) noexcept;
 
 		std::size_t get_packet_size(void) const noexcept;
 
