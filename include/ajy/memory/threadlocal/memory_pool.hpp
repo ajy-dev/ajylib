@@ -12,7 +12,7 @@
  * 	Requires a 64-bit platform with 48-bit canonical addresses.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: 2026-07-07
+ * Updated: 2026-07-20
  * Version: 0.1.0
  */
 
@@ -32,7 +32,7 @@
 
 namespace ajy::memory::threadlocal
 {
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	class MemoryPool
 	{
 	public:

@@ -5,7 +5,7 @@
  * 	A thread-local memory pool definition.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: 2026-07-07
+ * Updated: 2026-07-20
  * Version: 0.1.0
  */
 
@@ -25,7 +25,7 @@
 
 namespace ajy::memory::threadlocal
 {
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	MemoryPool<T>::MemoryPool(std::size_t max_size, std::size_t batch_size) noexcept
 		: tls_index(this->index_allocator.acquire())
 		, max_size(max_size)
@@ -33,7 +33,7 @@ namespace ajy::memory::threadlocal
 	{
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	MemoryPool<T>::~MemoryPool(void) noexcept
 	{
 		if (this->has_tls_slot())
@@ -47,7 +47,7 @@ namespace ajy::memory::threadlocal
 		this->index_allocator.release(this->tls_index);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	T *MemoryPool<T>::alloc(void) noexcept
 	{
 		FreeNode *node;
@@ -74,7 +74,7 @@ namespace ajy::memory::threadlocal
 		return reinterpret_cast<T *>(node);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::free(T *ptr) noexcept
 	{
 		if (!ptr)
@@ -101,7 +101,7 @@ namespace ajy::memory::threadlocal
 			this->drain_tls_to_global();
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	template <typename... Args>
 	T *MemoryPool<T>::create(Args &&...args) noexcept(std::is_nothrow_constructible<T, Args...>::value)
 	{
@@ -129,7 +129,7 @@ namespace ajy::memory::threadlocal
 		}
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::destroy(T *ptr) noexcept(std::is_nothrow_destructible<T>::value)
 	requires std::destructible<T>
 	{
@@ -140,20 +140,20 @@ namespace ajy::memory::threadlocal
 		this->free(ptr);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	std::size_t MemoryPool<T>::get_in_use_count(void) const noexcept
 	{
 		return this->in_use_count.load(std::memory_order_relaxed);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	MemoryPool<T>::TLSSlot::TLSSlot(void) noexcept
 		: head(nullptr)
 		, count(0)
 	{
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	MemoryPool<T>::TLSSlot::~TLSSlot(void) noexcept
 	{
 		FreeNode *current;
@@ -169,7 +169,7 @@ namespace ajy::memory::threadlocal
 		}
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	std::size_t MemoryPool<T>::IndexAllocator::acquire(void) noexcept
 	{
 		try
@@ -195,7 +195,7 @@ namespace ajy::memory::threadlocal
 		}
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::IndexAllocator::release(std::size_t index) noexcept
 	{
 		try
@@ -216,7 +216,7 @@ namespace ajy::memory::threadlocal
 		}
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	lockfree::MemoryPool<T> &MemoryPool<T>::get_global_pool(void) noexcept
 	{
 		static lockfree::MemoryPool<T> *instance = new lockfree::MemoryPool<T>();
@@ -224,7 +224,7 @@ namespace ajy::memory::threadlocal
 		return *instance;
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::push(FreeNode *node) noexcept
 	{
 		assert(this->has_tls_slot() && "MemoryPool: TLS slot must exist before push");
@@ -236,7 +236,7 @@ namespace ajy::memory::threadlocal
 		++slot.count;
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	FreeNode *MemoryPool<T>::pop(void) noexcept
 	{
 		assert(this->has_tls_slot() && "MemoryPool: TLS slot must exist before pop");
@@ -254,13 +254,13 @@ namespace ajy::memory::threadlocal
 		return node;
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	bool MemoryPool<T>::has_tls_slot(void) const noexcept
 	{
 		return this->tls_freelists.size() > this->tls_index;
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::refill_tls_from_global(void) noexcept
 	{
 		for (std::size_t i = 0; i < this->batch_size; ++i)
@@ -275,7 +275,7 @@ namespace ajy::memory::threadlocal
 		}
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::drain_tls_to_global(void) noexcept
 	{
 		for (std::size_t i = 0; i < this->batch_size; ++i)

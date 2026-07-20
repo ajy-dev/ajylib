@@ -5,7 +5,7 @@
  * 	A lockfree memory pool definition.
  * Author: ajy-dev
  * Created: 2026-06-16
- * Updated: 2026-07-07
+ * Updated: 2026-07-20
  * Version: 0.1.0
  */
 
@@ -26,7 +26,7 @@
 
 namespace ajy::memory::lockfree
 {
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	MemoryPool<T>::MemoryPool(std::size_t initial_capacity) noexcept
 		: head(this->pack(nullptr, 0))
 		, expand_size(initial_capacity)
@@ -35,7 +35,7 @@ namespace ajy::memory::lockfree
 		this->expand(this->expand_size);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	MemoryPool<T>::~MemoryPool(void) noexcept
 	{
 		Chunk<T> *current;
@@ -54,7 +54,7 @@ namespace ajy::memory::lockfree
 		}
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	T *MemoryPool<T>::alloc(void) noexcept
 	{
 		FreeNode *node;
@@ -84,7 +84,7 @@ namespace ajy::memory::lockfree
 		return reinterpret_cast<T *>(node);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::free(T *ptr) noexcept
 	{
 		FreeNode *node;
@@ -97,7 +97,7 @@ namespace ajy::memory::lockfree
 		this->push(node);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	template <typename... Args>
 	T *MemoryPool<T>::create(Args &&...args) noexcept(std::is_nothrow_constructible<T, Args...>::value)
 	{
@@ -125,7 +125,7 @@ namespace ajy::memory::lockfree
 		}
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::destroy(T *ptr) noexcept(std::is_nothrow_destructible<T>::value)
 	requires std::destructible<T>
 	{
@@ -136,13 +136,13 @@ namespace ajy::memory::lockfree
 		this->free(ptr);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	std::size_t MemoryPool<T>::get_in_use_count(void) const noexcept
 	{
 		return this->in_use_count.load(std::memory_order_relaxed);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	std::uintptr_t MemoryPool<T>::pack(FreeNode *ptr, std::uint16_t tag) noexcept
 	{
 		static constexpr std::uintptr_t PTR_MASK = 0x0000FFFFFFFFFFFFULL;
@@ -154,7 +154,7 @@ namespace ajy::memory::lockfree
 		return tag_bits | ptr_bits;
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	FreeNode *MemoryPool<T>::unpack_ptr(std::uintptr_t raw) noexcept
 	{
 		static constexpr std::uintptr_t PTR_MASK = 0x0000FFFFFFFFFFFFULL;
@@ -162,7 +162,7 @@ namespace ajy::memory::lockfree
 		return reinterpret_cast<FreeNode *>(raw & PTR_MASK);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	std::uint16_t MemoryPool<T>::unpack_tag(std::uintptr_t raw) noexcept
 	{
 		static constexpr unsigned int TAG_SHIFT = 48;
@@ -170,7 +170,7 @@ namespace ajy::memory::lockfree
 		return static_cast<std::uint16_t>(raw >> TAG_SHIFT);
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::push(FreeNode *node) noexcept
 	{
 		while (true)
@@ -188,7 +188,7 @@ namespace ajy::memory::lockfree
 		}
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	FreeNode *MemoryPool<T>::pop(void) noexcept
 	{
 		while (true)
@@ -210,7 +210,7 @@ namespace ajy::memory::lockfree
 		}
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	bool MemoryPool<T>::expand(std::size_t capacity) noexcept
 	{
 		Slot<T> *new_slots;
@@ -245,7 +245,7 @@ namespace ajy::memory::lockfree
 		return true;
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	FreeNode *MemoryPool<T>::build_free_list(Slot<T> *slots, std::size_t capacity) noexcept
 	{
 		if (!capacity)
@@ -259,7 +259,7 @@ namespace ajy::memory::lockfree
 		return &slots[0].free_node;
 	}
 
-	template <PoolableType T>
+	template <MemoryPoolableType T>
 	void MemoryPool<T>::push_range(FreeNode *first, FreeNode *last) noexcept
 	{
 		if (!first || !last)
