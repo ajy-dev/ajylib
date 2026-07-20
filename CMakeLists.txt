@@ -84,6 +84,7 @@ target_sources(
 			include/ajy/memory/concepts.hpp
 			include/ajy/memory/shared_types.hpp
 			include/ajy/memory/lockfree/memory_pool.hpp
+			include/ajy/memory/lockfree/object_pool.hpp
 			include/ajy/memory/threadlocal/memory_pool.hpp
 			include/ajy/io/output_device.hpp
 			include/ajy/io/stdio/output_device.hpp

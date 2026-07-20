@@ -24,12 +24,23 @@ namespace ajy::memory
 		};
 
 	template <typename T>
+	concept ClearableType =
+		requires(T &object) {
+			object.clear();
+		};
+
+	template <typename T>
 	concept MemoryPoolableType =
 		std::is_object<T>::value
 		&& !std::is_const<T>::value
 		&& !std::is_volatile<T>::value
 		&& !std::is_array<T>::value
 		&& CompleteType<T>;
+
+	template <typename T>
+	concept ObjectPoolableType =
+		MemoryPoolableType<T>
+		&& ClearableType<T>;
 }
 
 #endif
