@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server definition.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-06
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -13,6 +13,7 @@
 #include <ajy/network/protocol/packet_buffer.hpp>
 #include <ajy/windows.hpp>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <exception>
@@ -27,8 +28,10 @@
 
 namespace ajy::network::windows::iocp
 {
-	Server::Server(std::string_view logger_name) noexcept
+	Server::Server(std::string_view logger_name, std::size_t max_payload_size) noexcept
 		: logger(utility::Logger::get(logger_name))
+		, pool_payload_size(std::min(max_payload_size, Packet::MAX_PAYLOAD_SIZE))
+		, packet_pool(PACKET_POOL_INITIAL_CAPACITY, this->pool_payload_size)
 		, iocp_handle(nullptr)
 		, listen_socket(INVALID_SOCKET)
 		, max_sessions(0)
@@ -400,27 +403,68 @@ clean_wsa:
 		return this->calculate_tps(this->send_count, this->last_send_query, this->last_send_tps);
 	}
 
+	std::size_t Server::get_packet_pool_in_use(void) const noexcept
+	{
+		return this->packet_pool.get_in_use_count();
+	}
+
 	std::shared_ptr<Server::Packet> Server::alloc_packet(std::size_t payload_capacity) noexcept
 	{
-		std::shared_ptr<Packet> packet;
-
-		try
+		if (payload_capacity <= this->pool_payload_size)
 		{
-			packet = std::make_shared<Packet>(payload_capacity);
-		}
-		catch (const std::bad_alloc &error)
-		{
-			this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): %s", error.what());
-			return nullptr;
-		}
+			Packet *raw;
 
-		if (!packet->get_capacity())
-		{
-			this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): internal buffer allocation failed.");
-			return nullptr;
-		}
+			raw = this->packet_pool.acquire();
+			if (!raw)
+			{
+				this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): packet_pool.acquire() failed (out of memory).");
+				return nullptr;
+			}
 
-		return packet;
+			if (!raw->get_capacity())
+			{
+				this->packet_pool.release(raw);
+				this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): internal buffer allocation failed.");
+				return nullptr;
+			}
+
+			try
+			{
+				return std::shared_ptr<Packet>(
+					raw,
+					[this](Packet *packet) noexcept
+					{
+						this->packet_pool.release(packet);
+					});
+			}
+			catch (const std::bad_alloc &error)
+			{
+				this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): shared_ptr control block alloc failed: %s", error.what());
+				return nullptr;
+			}
+		}
+		else
+		{
+			std::shared_ptr<Packet> packet;
+
+			try
+			{
+				packet = std::make_shared<Packet>(payload_capacity);
+			}
+			catch (const std::bad_alloc &error)
+			{
+				this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): %s", error.what());
+				return nullptr;
+			}
+
+			if (!packet->get_capacity())
+			{
+				this->logger->log(utility::Logger::LogLevel::Error, "alloc_packet(): internal buffer allocation failed.");
+				return nullptr;
+			}
+
+			return packet;
+		}
 	}
 
 	bool Server::send_packet(SessionID id, std::shared_ptr<Packet> packet) noexcept

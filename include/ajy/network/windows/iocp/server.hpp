@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server declaration.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-06
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -15,6 +15,7 @@
 #include <ajy/container/lockfree/queue.hpp>
 #include <ajy/container/lockfree/stack.hpp>
 #include <ajy/container/ring_buffer.hpp>
+#include <ajy/memory/lockfree/object_pool.hpp>
 #include <ajy/network/protocol/packet_buffer.hpp>
 #include <ajy/network/server.hpp>
 #include <ajy/utility/logger.hpp>
@@ -35,7 +36,7 @@ namespace ajy::network::windows::iocp
 	class Server : public ajy::network::Server
 	{
 	public:
-		explicit Server(std::string_view logger_name) noexcept;
+		explicit Server(std::string_view logger_name, std::size_t max_payload_size = protocol::PacketBuffer::DEFAULT_PAYLOAD_CAPACITY) noexcept;
 		~Server(void) noexcept override;
 
 		Server(const Server &other) = delete;
@@ -52,6 +53,7 @@ namespace ajy::network::windows::iocp
 		std::uint32_t get_accept_tps(void) noexcept override;
 		std::uint32_t get_recv_message_tps(void) noexcept override;
 		std::uint32_t get_send_message_tps(void) noexcept override;
+		std::size_t get_packet_pool_in_use(void) const noexcept;
 
 	protected:
 		using ServerClock = std::conditional<
@@ -77,6 +79,7 @@ namespace ajy::network::windows::iocp
 		static constexpr std::uint16_t DEFAULT_MAX_PENDING_SENDS = 1024;
 		static constexpr std::size_t PENDING_SENDS_INITIAL_CAPACITY = 128;
 		static constexpr std::size_t SEND_BATCH_SIZE = 128;
+		static constexpr std::size_t PACKET_POOL_INITIAL_CAPACITY = 1024;
 
 		struct Session
 		{
@@ -120,6 +123,9 @@ namespace ajy::network::windows::iocp
 		void send_post(Session *session) noexcept;
 
 		void log_winapi_error(const char *func_name, DWORD error_code, utility::Logger::LogLevel level = utility::Logger::LogLevel::Error) noexcept;
+
+		const std::size_t pool_payload_size;
+		memory::lockfree::ObjectPool<Packet, std::size_t> packet_pool;
 
 		HANDLE iocp_handle;
 		SOCKET listen_socket;

@@ -11,37 +11,42 @@
  *	constructor; random_key is drawn per packet by the server.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: 2026-07-06
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
 #ifndef AJY_NETWORK_WINDOWS_IOCP_NET_SERVER_HPP
-# define AJY_NETWORK_WINDOWS_IOCP_NET_SERVER_HPP
+#define AJY_NETWORK_WINDOWS_IOCP_NET_SERVER_HPP
 
-# include <ajy/container/lockfree/queue.hpp>
-# include <ajy/container/lockfree/stack.hpp>
-# include <ajy/container/ring_buffer.hpp>
-# include <ajy/network/protocol/net_packet_buffer.hpp>
-# include <ajy/network/server.hpp>
-# include <ajy/utility/logger.hpp>
-# include <ajy/windows.hpp>
+#include <ajy/container/lockfree/queue.hpp>
+#include <ajy/container/lockfree/stack.hpp>
+#include <ajy/container/ring_buffer.hpp>
+#include <ajy/memory/lockfree/object_pool.hpp>
+#include <ajy/network/protocol/net_packet_buffer.hpp>
+#include <ajy/network/server.hpp>
+#include <ajy/utility/logger.hpp>
+#include <ajy/windows.hpp>
 
-# include <atomic>
-# include <chrono>
-# include <cstdint>
-# include <deque>
-# include <memory>
-# include <mutex>
-# include <thread>
-# include <utility>
-# include <vector>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <deque>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace ajy::network::windows::iocp
 {
 	class NetServer : public ajy::network::Server
 	{
 	public:
-		explicit NetServer(std::string_view logger_name, std::uint8_t code, std::uint8_t fixed_key) noexcept;
+		explicit NetServer(
+			std::string_view logger_name,
+			std::uint8_t code,
+			std::uint8_t fixed_key,
+			std::size_t max_payload_size = protocol::NetPacketBuffer::DEFAULT_PAYLOAD_CAPACITY) noexcept;
 		~NetServer(void) noexcept override;
 
 		NetServer(const NetServer &other) = delete;
@@ -58,6 +63,7 @@ namespace ajy::network::windows::iocp
 		std::uint32_t get_accept_tps(void) noexcept override;
 		std::uint32_t get_recv_message_tps(void) noexcept override;
 		std::uint32_t get_send_message_tps(void) noexcept override;
+		std::size_t get_packet_pool_in_use(void) const noexcept;
 
 	protected:
 		using ServerClock = std::conditional<
@@ -83,6 +89,7 @@ namespace ajy::network::windows::iocp
 		static constexpr std::uint16_t DEFAULT_MAX_PENDING_SENDS = 1024;
 		static constexpr std::size_t PENDING_SENDS_INITIAL_CAPACITY = 128;
 		static constexpr std::size_t SEND_BATCH_SIZE = 128;
+		static constexpr std::size_t PACKET_POOL_INITIAL_CAPACITY = 1024;
 
 		struct Session
 		{
@@ -131,6 +138,9 @@ namespace ajy::network::windows::iocp
 
 		const std::uint8_t code;
 		const std::uint8_t fixed_key;
+
+		const std::size_t pool_payload_size;
+		memory::lockfree::ObjectPool<Packet, std::size_t> packet_pool;
 
 		HANDLE iocp_handle;
 		SOCKET listen_socket;
