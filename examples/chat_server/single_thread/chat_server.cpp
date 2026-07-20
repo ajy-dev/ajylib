@@ -8,7 +8,7 @@
  *	follow in later sections.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: Never
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -29,12 +29,13 @@
 #include <vector>
 
 ChatServer::ChatServer(std::string_view logger_name) noexcept
-	: NetServer(logger_name, ChatServerConfig::PROTOCOL_CODE, ChatServerConfig::FIXED_KEY)
+	: NetServer(logger_name, ChatServerConfig::PROTOCOL_CODE, ChatServerConfig::FIXED_KEY, ChatServerConfig::MAX_PACKET_PAYLOAD)
 	, content_wake(false)
 	, content_running(false)
 	, content_job_count(0)
 	, last_content_query(ServerClock::now())
 	, last_content_tps(0)
+	, player_count(0)
 {
 }
 
@@ -172,6 +173,16 @@ std::uint32_t ChatServer::get_content_job_tps(void) noexcept
 		this->last_content_tps.store(static_cast<std::uint32_t>(tps), std::memory_order_relaxed);
 
 	return this->last_content_tps.load(std::memory_order_relaxed);
+}
+
+std::uint32_t ChatServer::get_player_count(void) const noexcept
+{
+	return this->player_count.load(std::memory_order_relaxed);
+}
+
+std::size_t ChatServer::get_job_pool_in_use(void) const noexcept
+{
+	return this->job_pool.get_in_use_count();
 }
 
 bool ChatServer::on_connection_request(const char *, std::uint16_t)
@@ -366,6 +377,9 @@ void ChatServer::handle_client_leave(SessionID id) noexcept
 		this->sector_remove_player(player);
 
 	this->player_map.erase(it);
+	if (player->logged_in)
+		this->player_count.fetch_sub(1, std::memory_order_relaxed);
+
 	this->player_pool.destroy(player);
 }
 
@@ -458,6 +472,7 @@ void ChatServer::handle_req_login(Player *player, Packet *packet) noexcept
 	*packet >> player->account_no >> player->id >> player->nickname; // SessionKey is present (validated above) but not read or stored.
 
 	player->logged_in = true;
+	this->player_count.fetch_add(1, std::memory_order_relaxed);
 
 	this->send_res_login(player->session_id, 1, player->account_no);
 }

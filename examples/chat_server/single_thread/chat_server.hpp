@@ -10,7 +10,7 @@
  *	wchar_t being 2 bytes (UTF-16) so sizeof matches the 40-byte wire field.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: Never
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -51,6 +51,8 @@ public:
 	void stop(void) noexcept override;
 
 	std::uint32_t get_content_job_tps(void) noexcept;
+	std::uint32_t get_player_count(void) const noexcept;
+	std::size_t get_job_pool_in_use(void) const noexcept;
 
 protected:
 	bool on_connection_request(const char *ip, std::uint16_t port) override;
@@ -128,6 +130,7 @@ private:
 	ajy::memory::threadlocal::MemoryPool<Player> player_pool;
 	std::unordered_map<SessionID, Player *> player_map;
 	std::array<Sector, ChatServerConfig::TOTAL_SECTORS> sectors;
+	std::atomic<std::uint32_t> player_count;
 
 	ajy::memory::lockfree::MemoryPool<Job> job_pool;
 	ajy::container::lockfree::Queue<Job *> job_queue;

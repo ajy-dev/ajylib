@@ -9,7 +9,7 @@
  *	protocol.hpp, not here.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: Never
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -46,6 +46,10 @@ namespace ChatServerConfig
 
 	// Maximum chat message length.
 	inline constexpr std::uint16_t MAX_MESSAGE_CHARS = 200;
+
+	// Packet-pool slot size. The largest outbound payload is RES_MESSAGE
+	// (protocol.hpp): 92-byte fixed part + MAX_MESSAGE_CHARS WCHARs = 492.
+	inline constexpr std::size_t MAX_PACKET_PAYLOAD = 492;
 }
 
 #endif

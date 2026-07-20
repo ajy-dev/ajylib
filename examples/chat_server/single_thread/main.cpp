@@ -9,7 +9,7 @@
  *	LOG_LEVEL below is hardcoded for quick editing.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: 2026-07-07
+ * Updated: 2026-07-21
  * Version: 0.1.0
  */
 
@@ -71,6 +71,35 @@ int main(void)
 		{
 			(void)args;
 			std::printf("Content Job TPS: %u\n", server.get_content_job_tps());
+		});
+	console.register_command(
+		"chat",
+		"player_count",
+		"Shows the current logged-in player count.",
+		[&server](std::istringstream &args)
+		{
+			(void)args;
+			std::printf("Player count: %u\n", server.get_player_count());
+		});
+
+	console.register_command(
+		"chat",
+		"packet_pool",
+		"Shows packets currently checked out from the packet pool.",
+		[&server](std::istringstream &args)
+		{
+			(void)args;
+			std::printf("Packet pool in-use: %zu\n", server.get_packet_pool_in_use());
+		});
+
+	console.register_command(
+		"chat",
+		"job_pool",
+		"Shows jobs currently checked out from the job pool.",
+		[&server](std::istringstream &args)
+		{
+			(void)args;
+			std::printf("Job pool in-use: %zu\n", server.get_job_pool_in_use());
 		});
 
 	reporter.start();
