@@ -18,7 +18,11 @@
 #include <chat_server/monitor_reporter.hpp>
 
 #include <chat_server/monitor_report_config.hpp>
-#include <chat_server/single_thread/chat_server.hpp>
+#ifdef CHAT_SERVER_MULTI_THREAD
+# include <chat_server/multi_thread/chat_server.hpp>
+#else
+# include <chat_server/single_thread/chat_server.hpp>
+#endif
 
 #include <ajy/network/protocol/net_packet_buffer.hpp>
 #include <ajy/utility/logger.hpp>
