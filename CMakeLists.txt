@@ -66,6 +66,7 @@ target_sources(
 		source/network/protocol/packet_buffer.cpp
 		source/network/protocol/net_packet_buffer.cpp
 		source/network/protocol/obfuscator/obfuscator.cpp
+		$<$<PLATFORM_ID:Windows>:source/windows.cpp>
 		$<$<PLATFORM_ID:Windows>:source/io/windows/output_device.cpp>
 		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/server.cpp>
 		$<$<PLATFORM_ID:Windows>:source/network/windows/iocp/net_server.cpp>

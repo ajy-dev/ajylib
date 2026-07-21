@@ -122,8 +122,6 @@ namespace ajy::network::windows::iocp
 		bool recv_post(Session *session) noexcept;
 		void send_post(Session *session) noexcept;
 
-		void log_winapi_error(const char *func_name, DWORD error_code, utility::Logger::LogLevel level = utility::Logger::LogLevel::Error) noexcept;
-
 		const std::size_t pool_payload_size;
 		memory::lockfree::ObjectPool<Packet, std::size_t> packet_pool;
 

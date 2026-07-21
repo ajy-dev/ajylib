@@ -65,6 +65,7 @@ namespace ajy::network::windows::iocp
 
 	bool Server::start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept
 	{
+		int wsa_result;
 		WSADATA wsa;
 		SOCKADDR_IN addr;
 		int thread_count;
@@ -72,9 +73,9 @@ namespace ajy::network::windows::iocp
 		if (this->running.load(std::memory_order_acquire))
 			return false;
 
-		if (::WSAStartup(MAKEWORD(2, 2), &wsa))
+		if ((wsa_result = ::WSAStartup(MAKEWORD(2, 2), &wsa)))
 		{
-			this->log_winapi_error("WSAStartup()", ::WSAGetLastError());
+			ajy::log_winapi_error("WSAStartup()", static_cast<DWORD>(wsa_result), this->logger);
 			return false;
 		}
 		this->logger->log(utility::Logger::LogLevel::Info, "Winsock initialized.");
@@ -93,7 +94,7 @@ namespace ajy::network::windows::iocp
 		this->iocp_handle = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
 		if (!this->iocp_handle)
 		{
-			this->log_winapi_error("CreateIoCompletionPort()", ::GetLastError());
+			ajy::log_winapi_error("CreateIoCompletionPort()", ::GetLastError(), this->logger);
 			goto clean_wsa;
 		}
 		this->logger->log(utility::Logger::LogLevel::Info, "IO Completion Port created.");
@@ -101,7 +102,7 @@ namespace ajy::network::windows::iocp
 		this->listen_socket = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (this->listen_socket == INVALID_SOCKET)
 		{
-			this->log_winapi_error("socket()", ::WSAGetLastError());
+			ajy::log_winapi_error("socket()", ::WSAGetLastError(), this->logger);
 			goto clean_iocp;
 		}
 		this->logger->log(utility::Logger::LogLevel::Info, "Listen socket created.");
@@ -124,14 +125,14 @@ namespace ajy::network::windows::iocp
 			addr.sin_addr.s_addr = ::htonl(INADDR_ANY);
 		if (::bind(this->listen_socket, reinterpret_cast<const SOCKADDR *>(&addr), sizeof(addr)))
 		{
-			this->log_winapi_error("bind()", ::WSAGetLastError());
+			ajy::log_winapi_error("bind()", ::WSAGetLastError(), this->logger);
 			goto clean_socket;
 		}
 		this->logger->log(utility::Logger::LogLevel::Info, "IP address bound to listen socket.");
 
 		if (::listen(this->listen_socket, SOMAXCONN) == SOCKET_ERROR)
 		{
-			this->log_winapi_error("listen()", ::WSAGetLastError());
+			ajy::log_winapi_error("listen()", ::WSAGetLastError(), this->logger);
 			goto clean_socket;
 		}
 		this->logger->log(utility::Logger::LogLevel::Info, "Listen socket is listening.");
@@ -538,7 +539,7 @@ clean_wsa:
 			if (client_socket == INVALID_SOCKET)
 			{
 				if (server->running.load(std::memory_order_acquire))
-					server->log_winapi_error("accept()", ::WSAGetLastError());
+					ajy::log_winapi_error("accept()", ::WSAGetLastError(), server->logger);
 				continue;
 			}
 
@@ -548,7 +549,7 @@ clean_wsa:
 				linger_option.l_onoff = 1;
 				linger_option.l_linger = 0;
 				if (::setsockopt(client_socket, SOL_SOCKET, SO_LINGER, reinterpret_cast<const char *>(&linger_option), sizeof(linger_option)) == SOCKET_ERROR)
-					server->log_winapi_error("setsockopt(SO_LINGER)", ::WSAGetLastError(), utility::Logger::LogLevel::Warning);
+					ajy::log_winapi_error("setsockopt(SO_LINGER)", ::WSAGetLastError(), server->logger, utility::Logger::LogLevel::Warning);
 			}
 
 			::inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
@@ -571,7 +572,7 @@ clean_wsa:
 
 			if (!::CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), server->iocp_handle, reinterpret_cast<ULONG_PTR>(session), 0))
 			{
-				server->log_winapi_error("CreateIoCompletionPort()", ::GetLastError());
+				ajy::log_winapi_error("CreateIoCompletionPort()", ::GetLastError(), server->logger);
 				::closesocket(client_socket);
 				session->socket = INVALID_SOCKET;
 				if (!server->free_indices.push(index.value()))
@@ -605,7 +606,7 @@ clean_wsa:
 			if (!overlapped)
 			{
 				if (!gqcs_ret)
-					server->log_winapi_error("GetQueuedCompletionStatus()", ::GetLastError());
+					ajy::log_winapi_error("GetQueuedCompletionStatus()", ::GetLastError(), server->logger);
 				server->on_worker_thread_end();
 				break;
 			}
@@ -631,7 +632,7 @@ clean_wsa:
 					break;
 				}
 				std::sprintf(func_name, "GetQueuedCompletionStatus(id: %llu)", id);
-				server->log_winapi_error(func_name, error_code, level);
+				ajy::log_winapi_error(func_name, error_code, server->logger, level);
 				server->release_session(session);
 				server->on_worker_thread_end();
 				continue;
@@ -909,7 +910,7 @@ clean_wsa:
 					level = utility::Logger::LogLevel::Error;
 					break;
 				}
-				this->log_winapi_error("WSARecv()", error_code, level);
+				ajy::log_winapi_error("WSARecv()", error_code, this->logger, level);
 				this->release_session(session);
 				return false;
 			}
@@ -1024,7 +1025,7 @@ clean_wsa:
 						level = utility::Logger::LogLevel::Error;
 						break;
 					}
-					this->log_winapi_error("WSASend()", error_code, level);
+					ajy::log_winapi_error("WSASend()", error_code, this->logger, level);
 					this->release_session(session);
 					session->send_flag.store(false, std::memory_order_release);
 					return;
@@ -1033,30 +1034,5 @@ clean_wsa:
 
 			break;
 		}
-	}
-
-	void Server::log_winapi_error(const char *func_name, DWORD error_code, utility::Logger::LogLevel level) noexcept
-	{
-		LPSTR buffer;
-
-		buffer = nullptr;
-		::FormatMessageA(
-			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-			NULL,
-			error_code,
-			MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-			reinterpret_cast<LPSTR>(&buffer),
-			0,
-			NULL);
-
-		if (buffer)
-		{
-			buffer[std::strcspn(buffer, "\r\n")] = '\0';
-			this->logger->log(level, "%s: %s", func_name, buffer);
-		}
-		else
-			this->logger->log(level, "%s: Unknown WinAPI error (Code: %lu)", func_name, error_code);
-
-		::LocalFree(buffer);
 	}
 }
