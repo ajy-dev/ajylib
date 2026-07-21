@@ -38,6 +38,8 @@ int main(void)
 {
 	std::size_t logger_index;
 	ajy::utility::Logger *logger;
+	std::size_t reporter_logger_index;
+	ajy::utility::Logger *reporter_logger;
 
 	logger_index = ajy::utility::Logger::create("chat_server");
 	if (logger_index >= ajy::utility::Logger::INVALID_INDEX)
@@ -49,6 +51,16 @@ int main(void)
 	logger = ajy::utility::Logger::get(logger_index);
 	logger->set_threshold(LOG_LEVEL);
 
+	reporter_logger_index = ajy::utility::Logger::create("monitor_reporter");
+	if (reporter_logger_index >= ajy::utility::Logger::INVALID_INDEX)
+	{
+		std::fprintf(stderr, "Logger::create() failed.\n");
+		return EXIT_FAILURE;
+	}
+
+	reporter_logger = ajy::utility::Logger::get(reporter_logger_index);
+	reporter_logger->set_threshold(LOG_LEVEL);
+
 	ajy::utility::monitor::Monitor monitor;
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::ProcessCpuProbe>("process_cpu"));
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::ProcessPrivateMemoryProbe>("process_mem_mb"));
@@ -58,7 +70,7 @@ int main(void)
 
 	ChatServer server("chat_server");
 	ajy::utility::Console console;
-	MonitorReporter reporter(monitor);
+	MonitorReporter reporter(monitor, server, "monitor_reporter");
 
 	ajy::network::register_server_commands(&console, &server);
 	ajy::utility::monitor::register_monitor_commands(&console, &monitor);
