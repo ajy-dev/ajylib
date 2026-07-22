@@ -1,3 +1,4 @@
 add_subdirectory(echo_server)
 add_subdirectory(chat_server)
 add_subdirectory(monitor_server)
+add_subdirectory(login_gated_chat)
