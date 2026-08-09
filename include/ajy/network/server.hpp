@@ -5,15 +5,17 @@
  * 	A pure abstract TCP server interface declaration.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-04
+ * Updated: 2026-08-09
  * Version: 0.1.0
  */
 
 #ifndef AJY_NETWORK_SERVER_HPP
 #define AJY_NETWORK_SERVER_HPP
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 namespace ajy::network
 {
@@ -21,6 +23,10 @@ namespace ajy::network
 	{
 	public:
 		using SessionID = std::uint64_t;
+		using ServerClock = std::conditional<
+			std::chrono::high_resolution_clock::is_steady,
+			std::chrono::high_resolution_clock,
+			std::chrono::steady_clock>::type;
 
 		Server(void) = default;
 		virtual ~Server(void) = default;
