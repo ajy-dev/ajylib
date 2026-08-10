@@ -1,27 +1,26 @@
 /**
- * File: echo_with_group_server.hpp
- * Path: ajylib/examples/echo_with_group/echo_with_group_server.hpp
+ * File: echo_sendintent_server.hpp
+ * Path: ajylib/examples/echo_sendintent/echo_sendintent_server.hpp
  * Description:
- *	An echo server split into content groups (one auth group and a shard of
- *	echo groups) built on ajy::network::windows::iocp::NetServer.
+ *	A variant of echo_with_group whose group threads never issue a send
+ *	syscall: finished packets are handed to a SendWorkerPool instead.
  * Note:
- *	Every session enters the auth group on connect, so the server's own
- *	on_recv only sees packets that arrive while a session belongs to no
- *	group (i.e. mid-move); those are dropped.
- *	No idle timeout: the dummy client's loop may stall, and a timeout would
- *	disconnect it spuriously.
+ *	Measurement scaffolding. Run it against echo_with_group under the same
+ *	dummy settings to size how much of a group thread's per-packet cost is
+ *	the send path.
  * Author: ajy-dev
  * Created: 2026-08-10
  * Updated: Never
  * Version: 0.1.0
  */
 
-#ifndef ECHO_WITH_GROUP_SERVER_HPP
-#define ECHO_WITH_GROUP_SERVER_HPP
+#ifndef ECHO_SENDINTENT_SERVER_HPP
+#define ECHO_SENDINTENT_SERVER_HPP
 
 #include "account_store.hpp"
 #include "auth_group.hpp"
 #include "echo_group.hpp"
+#include "send_worker_pool.hpp"
 
 #include <ajy/network/windows/iocp/net_server.hpp>
 
@@ -33,24 +32,27 @@
 #include <string_view>
 #include <vector>
 
-class EchoWithGroupServer : public ajy::network::windows::iocp::NetServer
+class EchoSendIntentServer : public ajy::network::windows::iocp::NetServer
 {
 public:
-	explicit EchoWithGroupServer(std::string_view logger_name) noexcept;
-	~EchoWithGroupServer(void) noexcept override;
+	explicit EchoSendIntentServer(std::string_view logger_name) noexcept;
+	~EchoSendIntentServer(void) noexcept override;
 
-	EchoWithGroupServer(const EchoWithGroupServer &other) = delete;
-	EchoWithGroupServer &operator=(const EchoWithGroupServer &other) = delete;
-	EchoWithGroupServer(EchoWithGroupServer &&other) = delete;
-	EchoWithGroupServer &operator=(EchoWithGroupServer &&other) = delete;
+	EchoSendIntentServer(const EchoSendIntentServer &other) = delete;
+	EchoSendIntentServer &operator=(const EchoSendIntentServer &other) = delete;
+	EchoSendIntentServer(EchoSendIntentServer &&other) = delete;
+	EchoSendIntentServer &operator=(EchoSendIntentServer &&other) = delete;
+
+	bool start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept override;
+	void stop(void) noexcept override;
 
 	std::uint32_t get_auth_frame_tps(void) noexcept;
 	std::uint32_t get_echo_frame_tps(std::size_t shard) noexcept;
-	std::uint32_t get_auth_session_count(void) const noexcept;
 	std::uint32_t get_echo_session_count(std::size_t shard) const noexcept;
 	std::size_t get_echo_group_count(void) const noexcept;
 	std::size_t get_echo_job_pool_in_use(std::size_t shard) const noexcept;
-	std::size_t get_auth_job_pool_in_use(void) const noexcept;
+	std::size_t get_send_worker_count(void) const noexcept;
+	bool is_send_queue_empty(std::size_t worker) const noexcept;
 
 	void query_send_batching(std::uint32_t &completions_per_second, std::size_t &mean_size) noexcept;
 
@@ -65,6 +67,7 @@ protected:
 
 private:
 	AccountStore accounts;
+	SendWorkerPool senders;
 	std::vector<std::unique_ptr<EchoGroup>> echoes;
 	AuthGroup auth;
 

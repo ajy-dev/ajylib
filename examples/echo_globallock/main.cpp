@@ -1,8 +1,8 @@
 /**
  * File: main.cpp
- * Path: ajylib/examples/echo_baseline/main.cpp
+ * Path: ajylib/examples/echo_globallock/main.cpp
  * Description:
- *	Entry point for the echo_baseline example. Drives the server through an
+ *	Entry point for the echo_globallock example. Drives the server through an
  *	interactive management console; type 'help' for available commands,
  *	'exit' to quit.
  * Note:
@@ -13,7 +13,7 @@
  * Version: 0.1.0
  */
 
-#include "echo_baseline_server.hpp"
+#include "echo_globallock_server.hpp"
 #include "monitor_reporter.hpp"
 
 #include <ajy/network/server_console_commands.hpp>
@@ -40,7 +40,7 @@ int main(void)
 	std::size_t logger_index;
 	ajy::utility::Logger *logger;
 
-	logger_index = ajy::utility::Logger::create("echo_baseline");
+	logger_index = ajy::utility::Logger::create("echo_globallock");
 	if (logger_index >= ajy::utility::Logger::INVALID_INDEX)
 	{
 		std::fprintf(stderr, "Logger::create() failed.\n");
@@ -57,12 +57,27 @@ int main(void)
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemAvailableMemoryProbe>("system_available_mem_mb"));
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemNonpagedMemoryProbe>("system_nonpaged_mem_mb"));
 
-	EchoBaselineServer server("echo_baseline");
+	EchoGlobalLockServer server("echo_globallock");
 	ajy::utility::Console console;
 	MonitorReporter reporter(monitor);
 
 	ajy::network::register_server_commands(&console, &server);
 	ajy::utility::monitor::register_monitor_commands(&console, &monitor);
+
+	console.register_command(
+		"echo",
+		"send_queue",
+		"Shows whether each send worker's queue is drained.",
+		[&server](std::istringstream &args)
+		{
+			std::size_t i;
+
+			(void)args;
+
+			for (i = 0; i < server.get_send_worker_count(); ++i)
+				std::printf("Send[%zu]: %s ", i, server.is_send_queue_empty(i) ? "empty" : "BUSY");
+			std::printf("\n");
+		});
 
 	console.register_command(
 		"echo",
@@ -91,7 +106,7 @@ int main(void)
 
 	reporter.start();
 
-	std::printf("EchoBaselineServer management console. Type 'help' for commands, 'exit' to quit.\n");
+	std::printf("EchoGlobalLockServer management console. Type 'help' for commands, 'exit' to quit.\n");
 	console.run();
 
 	reporter.stop();

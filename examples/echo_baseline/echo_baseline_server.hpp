@@ -21,6 +21,8 @@
 
 #include <ajy/network/windows/iocp/net_server.hpp>
 
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -37,6 +39,8 @@ public:
 	EchoBaselineServer(EchoBaselineServer &&other) = delete;
 	EchoBaselineServer &operator=(EchoBaselineServer &&other) = delete;
 
+	void query_send_batching(std::uint32_t &completions_per_second, std::size_t &mean_size) noexcept;
+
 protected:
 	bool on_connection_request(const char *ip, std::uint16_t port) override;
 	void on_client_join(SessionID id) noexcept override;
@@ -49,6 +53,10 @@ protected:
 private:
 	void handle_req_login(SessionID id, Packet *packet) noexcept;
 	void handle_req_echo(SessionID id, Packet *packet) noexcept;
+
+	std::atomic<std::uint32_t> send_completion_count;
+	std::atomic<std::uint64_t> send_completion_bytes;
+	std::atomic<ServerClock::time_point> last_send_batching_query;
 };
 
 #endif

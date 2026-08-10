@@ -24,6 +24,7 @@
 #include <ajy/utility/monitor/windows/cpu_probe.hpp>
 #include <ajy/utility/monitor/windows/memory_probe.hpp>
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
@@ -109,6 +110,21 @@ int main(void)
 			for (i = 0; i < server.get_echo_group_count(); ++i)
 				std::printf(" / Echo[%zu]: %zu", i, server.get_echo_job_pool_in_use(i));
 			std::printf("\n");
+		});
+
+	console.register_command(
+		"group",
+		"send_batch",
+		"Shows completed WSASend calls per second and their mean size.",
+		[&server](std::istringstream &args)
+		{
+			std::uint32_t completions_per_second;
+			std::size_t mean_size;
+
+			(void)args;
+
+			server.query_send_batching(completions_per_second, mean_size);
+			std::printf("Send completions/sec: %u, mean bytes: %zu\n", completions_per_second, mean_size);
 		});
 
 	console.register_command(

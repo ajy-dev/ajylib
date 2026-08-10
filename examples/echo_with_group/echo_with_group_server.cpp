@@ -16,6 +16,9 @@
 
 #include <ajy/utility/logger.hpp>
 
+#include <chrono>
+#include <cstdint>
+
 #include <cstdio>
 #include <exception>
 #include <new>
@@ -27,6 +30,9 @@ EchoWithGroupServer::EchoWithGroupServer(std::string_view logger_name) noexcept
 		  EchoServerConfig::FIXED_KEY,
 		  EchoServerConfig::MAX_PACKET_PAYLOAD)
 	, auth(*this, this->echoes, this->accounts, EchoServerConfig::AUTH_GROUP_FPS)
+	, send_completion_count(0)
+	, send_completion_bytes(0)
+	, last_send_batching_query(ServerClock::now())
 {
 	std::size_t i;
 
@@ -116,7 +122,29 @@ void EchoWithGroupServer::on_recv(SessionID id, std::unique_ptr<Packet> packet) 
 void EchoWithGroupServer::on_send(SessionID id, std::size_t size) noexcept
 {
 	(void)id;
-	(void)size;
+
+	this->send_completion_count.fetch_add(1, std::memory_order_relaxed);
+	this->send_completion_bytes.fetch_add(size, std::memory_order_relaxed);
+}
+
+void EchoWithGroupServer::query_send_batching(std::uint32_t &completions_per_second, std::size_t &mean_size) noexcept
+{
+	ServerClock::time_point now;
+	ServerClock::time_point previous;
+	std::chrono::duration<double> elapsed;
+	std::uint32_t count;
+	std::uint64_t bytes;
+
+	now = ServerClock::now();
+	previous = this->last_send_batching_query.exchange(now, std::memory_order_relaxed);
+	count = this->send_completion_count.exchange(0, std::memory_order_relaxed);
+	bytes = this->send_completion_bytes.exchange(0, std::memory_order_relaxed);
+
+	elapsed = now - previous;
+	completions_per_second = (elapsed.count() > 0.0)
+		? static_cast<std::uint32_t>(static_cast<double>(count) / elapsed.count())
+		: 0;
+	mean_size = count ? static_cast<std::size_t>(bytes / count) : 0;
 }
 
 void EchoWithGroupServer::on_worker_thread_begin(void) noexcept

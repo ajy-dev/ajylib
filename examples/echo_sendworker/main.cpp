@@ -1,9 +1,9 @@
 /**
  * File: main.cpp
- * Path: ajylib/examples/echo_baseline/main.cpp
+ * Path: ajylib/examples/echo_with_group/main.cpp
  * Description:
- *	Entry point for the echo_baseline example. Drives the server through an
- *	interactive management console; type 'help' for available commands,
+ *	Entry point for the echo_with_group example. Drives the server through
+ *	an interactive management console; type 'help' for available commands,
  *	'exit' to quit.
  * Note:
  *	LOG_LEVEL below is hardcoded for quick editing.
@@ -13,7 +13,7 @@
  * Version: 0.1.0
  */
 
-#include "echo_baseline_server.hpp"
+#include "echo_sendworker_server.hpp"
 #include "monitor_reporter.hpp"
 
 #include <ajy/network/server_console_commands.hpp>
@@ -40,7 +40,7 @@ int main(void)
 	std::size_t logger_index;
 	ajy::utility::Logger *logger;
 
-	logger_index = ajy::utility::Logger::create("echo_baseline");
+	logger_index = ajy::utility::Logger::create("echo_sendworker");
 	if (logger_index >= ajy::utility::Logger::INVALID_INDEX)
 	{
 		std::fprintf(stderr, "Logger::create() failed.\n");
@@ -57,7 +57,7 @@ int main(void)
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemAvailableMemoryProbe>("system_available_mem_mb"));
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemNonpagedMemoryProbe>("system_nonpaged_mem_mb"));
 
-	EchoBaselineServer server("echo_baseline");
+	EchoSendWorkerServer server("echo_sendworker");
 	ajy::utility::Console console;
 	MonitorReporter reporter(monitor);
 
@@ -65,7 +65,57 @@ int main(void)
 	ajy::utility::monitor::register_monitor_commands(&console, &monitor);
 
 	console.register_command(
-		"echo",
+		"group",
+		"fps",
+		"Shows each group's frame rate (frames/sec) since the last call.",
+		[&server](std::istringstream &args)
+		{
+			std::size_t i;
+
+			(void)args;
+
+			std::printf("Auth FPS: %u", server.get_auth_frame_tps());
+			for (i = 0; i < server.get_echo_group_count(); ++i)
+				std::printf(" / Echo[%zu] FPS: %u", i, server.get_echo_frame_tps(i));
+			std::printf("\n");
+		});
+
+	console.register_command(
+		"group",
+		"session_count",
+		"Shows the session count of each group.",
+		[&server](std::istringstream &args)
+		{
+			std::size_t i;
+
+			(void)args;
+
+			for (i = 0; i < server.get_echo_group_count(); ++i)
+				std::printf("Echo[%zu]: %u ", i, server.get_echo_session_count(i));
+			std::printf("\n");
+		});
+
+	console.register_command(
+		"group",
+		"job_pool",
+		"Shows jobs currently queued in each group (backlog).",
+		[&server](std::istringstream &args)
+		{
+			std::size_t i;
+
+			(void)args;
+
+			for (i = 0; i < server.get_echo_group_count(); ++i)
+				std::printf("Echo[%zu]: %zu ", i, server.get_echo_job_pool_in_use(i));
+			std::printf("\n");
+
+			for (i = 0; i < server.get_send_worker_count(); ++i)
+				std::printf("Send[%zu]: %s ", i, server.is_send_queue_empty(i) ? "empty" : "BUSY");
+			std::printf("\n");
+		});
+
+	console.register_command(
+		"group",
 		"send_batch",
 		"Shows completed WSASend calls per second and their mean size.",
 		[&server](std::istringstream &args)
@@ -80,7 +130,7 @@ int main(void)
 		});
 
 	console.register_command(
-		"echo",
+		"group",
 		"packet_pool",
 		"Shows packets currently checked out from the packet pool.",
 		[&server](std::istringstream &args)
@@ -91,7 +141,7 @@ int main(void)
 
 	reporter.start();
 
-	std::printf("EchoBaselineServer management console. Type 'help' for commands, 'exit' to quit.\n");
+	std::printf("EchoSendWorkerServer management console. Type 'help' for commands, 'exit' to quit.\n");
 	console.run();
 
 	reporter.stop();

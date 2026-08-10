@@ -1,6 +1,6 @@
 /**
- * File: echo_baseline_server.cpp
- * Path: ajylib/examples/echo_baseline/echo_baseline_server.cpp
+ * File: echo_baseline_sw_server.cpp
+ * Path: ajylib/examples/echo_baseline_sw/echo_baseline_sw_server.cpp
  * Description:
  *	A baseline echo server that handles every packet directly on the IOCP
  *	worker thread.
@@ -10,7 +10,7 @@
  * Version: 0.1.0
  */
 
-#include "echo_baseline_server.hpp"
+#include "echo_baseline_sw_server.hpp"
 
 #include "echo_server_config.hpp"
 #include "protocol.hpp"
@@ -20,24 +20,51 @@
 #include <chrono>
 #include <cstdint>
 
-EchoBaselineServer::EchoBaselineServer(std::string_view logger_name) noexcept
+#include <utility>
+
+EchoBaselineSwServer::EchoBaselineSwServer(std::string_view logger_name) noexcept
 	: ajy::network::windows::iocp::NetServer(
 		  logger_name,
 		  EchoServerConfig::PROTOCOL_CODE,
 		  EchoServerConfig::FIXED_KEY,
 		  EchoServerConfig::MAX_PACKET_PAYLOAD)
+	, senders(*this, EchoServerConfig::SEND_WORKER_COUNT)
 	, send_completion_count(0)
 	, send_completion_bytes(0)
 	, last_send_batching_query(ServerClock::now())
 {
 }
 
-EchoBaselineServer::~EchoBaselineServer(void) noexcept
+EchoBaselineSwServer::~EchoBaselineSwServer(void) noexcept
 {
 	this->stop();
 }
 
-bool EchoBaselineServer::on_connection_request(const char *ip, std::uint16_t port)
+bool EchoBaselineSwServer::start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept
+{
+	this->senders.start();
+
+	return ajy::network::windows::iocp::NetServer::start(bind_ip, port, worker_thread_count, nagle, max_sessions);
+}
+
+void EchoBaselineSwServer::stop(void) noexcept
+{
+	ajy::network::windows::iocp::NetServer::stop();
+
+	this->senders.stop();
+}
+
+std::size_t EchoBaselineSwServer::get_send_worker_count(void) const noexcept
+{
+	return this->senders.get_worker_count();
+}
+
+bool EchoBaselineSwServer::is_send_queue_empty(std::size_t worker) const noexcept
+{
+	return this->senders.is_queue_empty(worker);
+}
+
+bool EchoBaselineSwServer::on_connection_request(const char *ip, std::uint16_t port)
 {
 	(void)ip;
 	(void)port;
@@ -45,17 +72,17 @@ bool EchoBaselineServer::on_connection_request(const char *ip, std::uint16_t por
 	return true;
 }
 
-void EchoBaselineServer::on_client_join(SessionID id) noexcept
+void EchoBaselineSwServer::on_client_join(SessionID id) noexcept
 {
 	(void)id;
 }
 
-void EchoBaselineServer::on_client_leave(SessionID id) noexcept
+void EchoBaselineSwServer::on_client_leave(SessionID id) noexcept
 {
 	(void)id;
 }
 
-void EchoBaselineServer::on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
+void EchoBaselineSwServer::on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
 {
 	PacketType type;
 
@@ -75,7 +102,7 @@ void EchoBaselineServer::on_recv(SessionID id, std::unique_ptr<Packet> packet) n
 		this->disconnect(id);
 }
 
-void EchoBaselineServer::on_send(SessionID id, std::size_t size) noexcept
+void EchoBaselineSwServer::on_send(SessionID id, std::size_t size) noexcept
 {
 	(void)id;
 
@@ -83,7 +110,7 @@ void EchoBaselineServer::on_send(SessionID id, std::size_t size) noexcept
 	this->send_completion_bytes.fetch_add(size, std::memory_order_relaxed);
 }
 
-void EchoBaselineServer::query_send_batching(std::uint32_t &completions_per_second, std::size_t &mean_size) noexcept
+void EchoBaselineSwServer::query_send_batching(std::uint32_t &completions_per_second, std::size_t &mean_size) noexcept
 {
 	ServerClock::time_point now;
 	ServerClock::time_point previous;
@@ -103,15 +130,15 @@ void EchoBaselineServer::query_send_batching(std::uint32_t &completions_per_seco
 	mean_size = count ? static_cast<std::size_t>(bytes / count) : 0;
 }
 
-void EchoBaselineServer::on_worker_thread_begin(void) noexcept
+void EchoBaselineSwServer::on_worker_thread_begin(void) noexcept
 {
 }
 
-void EchoBaselineServer::on_worker_thread_end(void) noexcept
+void EchoBaselineSwServer::on_worker_thread_end(void) noexcept
 {
 }
 
-void EchoBaselineServer::handle_req_login(SessionID id, Packet *packet) noexcept
+void EchoBaselineSwServer::handle_req_login(SessionID id, Packet *packet) noexcept
 {
 	std::shared_ptr<Packet> reply;
 	std::int64_t account_no;
@@ -126,10 +153,10 @@ void EchoBaselineServer::handle_req_login(SessionID id, Packet *packet) noexcept
 	*reply << LoginStatus::OK;
 	*reply << account_no;
 
-	this->send_packet(id, reply);
+	this->senders.post(id, std::move(reply));
 }
 
-void EchoBaselineServer::handle_req_echo(SessionID id, Packet *packet) noexcept
+void EchoBaselineSwServer::handle_req_echo(SessionID id, Packet *packet) noexcept
 {
 	std::shared_ptr<Packet> reply;
 	std::int64_t account_no;
@@ -146,5 +173,5 @@ void EchoBaselineServer::handle_req_echo(SessionID id, Packet *packet) noexcept
 	*reply << account_no;
 	*reply << send_time;
 
-	this->send_packet(id, reply);
+	this->senders.post(id, std::move(reply));
 }
