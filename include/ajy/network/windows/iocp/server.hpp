@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server declaration.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-08-09
+ * Updated: 2026-08-10
  * Version: 0.1.0
  */
 
@@ -31,6 +31,12 @@
 #include <thread>
 #include <utility>
 #include <vector>
+
+namespace ajy::concurrency
+{
+	template <typename TServer>
+	class Group;
+}
 
 namespace ajy::network::windows::iocp
 {
@@ -61,6 +67,9 @@ namespace ajy::network::windows::iocp
 		std::shared_ptr<Packet> alloc_packet(std::size_t payload_capacity = Packet::DEFAULT_PAYLOAD_CAPACITY) noexcept;
 		bool send_packet(SessionID id, std::shared_ptr<Packet> packet) noexcept;
 
+		void add_group(concurrency::Group<Server> &group) noexcept;
+		bool set_session_group(SessionID id, concurrency::Group<Server> *group) noexcept;
+
 	protected:
 		virtual bool on_connection_request(const char *ip, std::uint16_t port) = 0;
 		virtual void on_client_join(SessionID id) noexcept = 0;
@@ -81,6 +90,7 @@ namespace ajy::network::windows::iocp
 		struct Session
 		{
 			std::uint32_t index;
+			std::atomic<concurrency::Group<Server> *> group;
 
 			SOCKET socket;
 
@@ -130,6 +140,7 @@ namespace ajy::network::windows::iocp
 
 		std::thread accept_thread;
 		std::vector<std::thread> worker_threads;
+		std::vector<concurrency::Group<Server> *> groups;
 
 		std::unique_ptr<Session[]> sessions;
 		container::lockfree::Stack<std::uint32_t> free_indices;

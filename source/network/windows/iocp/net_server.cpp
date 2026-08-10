@@ -10,6 +10,7 @@
  */
 
 #include <ajy/network/windows/iocp/net_server.hpp>
+#include <ajy/concurrency/group.hpp>
 #include <ajy/network/protocol/net_packet_buffer.hpp>
 #include <ajy/windows.hpp>
 
@@ -159,6 +160,7 @@ namespace ajy::network::windows::iocp
 		for (std::uint32_t i = 0; i < max_sessions; ++i)
 		{
 			this->sessions[i].index = i;
+			this->sessions[i].group.store(nullptr, std::memory_order_relaxed);
 			this->sessions[i].socket = INVALID_SOCKET;
 			this->sessions[i].pending_send_count.store(0, std::memory_order_relaxed);
 			this->sessions[i].in_flight_offset = 0;
@@ -182,6 +184,9 @@ namespace ajy::network::windows::iocp
 		this->last_send_query.store(ServerClock::now(), std::memory_order_relaxed);
 		this->max_pending_sends.store(DEFAULT_MAX_PENDING_SENDS, std::memory_order_relaxed);
 		this->running.store(true, std::memory_order_release);
+
+		for (concurrency::Group<NetServer> *group : this->groups)
+			group->start();
 
 		try
 		{
@@ -346,6 +351,9 @@ clean_wsa:
 			}
 		}
 		this->worker_threads.clear();
+
+		for (concurrency::Group<NetServer> *group : this->groups)
+			group->stop();
 
 		for (std::uint32_t i = 0; i < this->max_sessions; ++i)
 		{
@@ -525,6 +533,34 @@ clean_wsa:
 		this->send_post(session);
 
 		this->release_session(session);
+		return true;
+	}
+
+	void NetServer::add_group(concurrency::Group<NetServer> &group) noexcept
+	{
+		try
+		{
+			this->groups.push_back(&group);
+		}
+		catch (const std::bad_alloc &error)
+		{
+			this->logger->log(utility::Logger::LogLevel::Fatal, "std::vector::push_back(groups): %s", error.what());
+			std::terminate();
+		}
+	}
+
+	bool NetServer::set_session_group(SessionID id, concurrency::Group<NetServer> *group) noexcept
+	{
+		Session *session;
+
+		session = this->acquire_session(id);
+		if (!session)
+			return false;
+
+		session->group.store(group, std::memory_order_release);
+
+		this->release_session(session);
+
 		return true;
 	}
 
@@ -722,6 +758,8 @@ clean_wsa:
 
 				for (std::unique_ptr<Packet> &packet : packets)
 				{
+					concurrency::Group<NetServer> *group;
+
 					if (!packet->decode(server->fixed_key))
 					{
 						server->logger->log(utility::Logger::LogLevel::Warning, "Recv decode/checksum failed: id=%llu", id);
@@ -730,7 +768,12 @@ clean_wsa:
 						break;
 					}
 					server->recv_count.fetch_add(1, std::memory_order_relaxed);
-					server->on_recv(id, std::move(packet));
+
+					group = session->group.load(std::memory_order_acquire);
+					if (group)
+						group->post_recv(id, std::move(packet));
+					else
+						server->on_recv(id, std::move(packet));
 				}
 
 				if (desync && !disconnected)
@@ -859,6 +902,7 @@ clean_wsa:
 		if (session->ref_count.fetch_sub(1, std::memory_order_release) == 1)
 		{
 			SessionID id;
+			concurrency::Group<NetServer> *group;
 
 			try
 			{
@@ -875,6 +919,7 @@ clean_wsa:
 			}
 
 			id = this->pack_session_id(session->index, session->generation.load(std::memory_order_relaxed));
+			group = session->group.exchange(nullptr, std::memory_order_acq_rel);
 
 			::closesocket(session->socket);
 			session->socket = INVALID_SOCKET;
@@ -893,6 +938,9 @@ clean_wsa:
 				this->logger->log(utility::Logger::LogLevel::Error, "free_indices.push() failed. Slot lost. index: %u", session->index);
 
 			this->active_session_count.fetch_sub(1, std::memory_order_relaxed);
+
+			if (group)
+				group->post_leave(id);
 
 			this->on_client_leave(id);
 		}

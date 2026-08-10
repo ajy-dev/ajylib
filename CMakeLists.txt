@@ -99,6 +99,7 @@ target_sources(
 			include/ajy/network/protocol/packet_buffer.hpp
 			include/ajy/network/protocol/net_packet_buffer.hpp
 			include/ajy/network/protocol/obfuscator/obfuscator.hpp
+			include/ajy/concurrency/group.hpp
 			$<$<PLATFORM_ID:Windows>:include/ajy/io/windows/output_device.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/windows.hpp>
 			$<$<PLATFORM_ID:Windows>:include/ajy/utility/monitor/windows/cpu_probe.hpp>
