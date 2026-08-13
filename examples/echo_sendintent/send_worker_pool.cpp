@@ -154,7 +154,11 @@ void SendWorkerPool::thread_proc(SendWorkerPool *pool, Worker *worker) noexcept
 		std::optional<Job> job;
 
 		worker->wake.wait(false, std::memory_order_acquire);
-		worker->wake.store(false, std::memory_order_relaxed);
+
+		while ((job = worker->jobs.dequeue()).has_value())
+			pool->dispatch(job.value());
+
+		worker->wake.store(false, std::memory_order_release);
 
 		while ((job = worker->jobs.dequeue()).has_value())
 			pool->dispatch(job.value());

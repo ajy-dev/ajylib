@@ -25,6 +25,7 @@ EchoGroup::EchoGroup(
 	, accounts(accounts)
 	, senders(senders)
 	, session_count(0)
+	, account_miss_count(0)
 {
 }
 
@@ -43,13 +44,23 @@ void EchoGroup::on_enter(SessionID id) noexcept
 
 	this->session_count.fetch_add(1, std::memory_order_relaxed);
 
+	// A miss means AuthGroup's entry went missing between put() and take() --
+	// the session died mid-move and on_client_leave removed it first. The
+	// session cannot be served without its account, so it is dropped, but the
+	// count says how often that race actually fires.
 	if (!this->accounts.take(id, account_no))
 	{
+		this->account_miss_count.fetch_add(1, std::memory_order_relaxed);
 		this->server.disconnect(id);
 		return;
 	}
 
 	this->senders.post(id, PacketType::RES_LOGIN, account_no, 0);
+}
+
+std::size_t EchoGroup::get_account_miss_count(void) const noexcept
+{
+	return this->account_miss_count.load(std::memory_order_relaxed);
 }
 
 void EchoGroup::on_leave(SessionID id) noexcept

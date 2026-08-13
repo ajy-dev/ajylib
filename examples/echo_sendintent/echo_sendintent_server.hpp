@@ -51,8 +51,15 @@ public:
 	std::uint32_t get_echo_session_count(std::size_t shard) const noexcept;
 	std::size_t get_echo_group_count(void) const noexcept;
 	std::size_t get_echo_job_pool_in_use(std::size_t shard) const noexcept;
+	std::size_t get_echo_rejected_session_count(std::size_t shard) const noexcept;
 	std::size_t get_send_worker_count(void) const noexcept;
 	bool is_send_queue_empty(std::size_t worker) const noexcept;
+
+	std::size_t get_orphan_recv_count(void) const noexcept;
+	std::size_t get_orphan_join_count(void) const noexcept;
+	std::size_t get_account_store_size(void) noexcept;
+	std::size_t get_echo_account_miss_count(std::size_t shard) const noexcept;
+	std::size_t get_echo_stale_enter_count(std::size_t shard) const noexcept;
 
 	void query_send_batching(std::uint32_t &completions_per_second, std::size_t &mean_size) noexcept;
 
@@ -66,6 +73,9 @@ protected:
 	void on_worker_thread_end(void) noexcept override;
 
 private:
+	std::atomic<std::size_t> orphan_recv_count;
+	std::atomic<std::size_t> orphan_join_count;
+
 	AccountStore accounts;
 	SendWorkerPool senders;
 	std::vector<std::unique_ptr<EchoGroup>> echoes;

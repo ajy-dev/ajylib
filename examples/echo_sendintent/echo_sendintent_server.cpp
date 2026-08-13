@@ -13,6 +13,7 @@
 #include "echo_sendintent_server.hpp"
 
 #include "echo_server_config.hpp"
+#include "protocol.hpp"
 
 #include <ajy/utility/logger.hpp>
 
@@ -29,6 +30,8 @@ EchoSendIntentServer::EchoSendIntentServer(std::string_view logger_name) noexcep
 		  EchoServerConfig::PROTOCOL_CODE,
 		  EchoServerConfig::FIXED_KEY,
 		  EchoServerConfig::MAX_PACKET_PAYLOAD)
+	, orphan_recv_count(0)
+	, orphan_join_count(0)
 	, senders(*this, EchoServerConfig::SEND_WORKER_COUNT)
 	, auth(*this, this->echoes, this->accounts, EchoServerConfig::AUTH_GROUP_FPS)
 	, send_completion_count(0)
@@ -98,7 +101,12 @@ std::size_t EchoSendIntentServer::get_echo_group_count(void) const noexcept
 
 std::size_t EchoSendIntentServer::get_echo_job_pool_in_use(std::size_t shard) const noexcept
 {
-	return this->echoes[shard]->get_job_pool_in_use();
+	return this->echoes[shard]->get_queued_job_count();
+}
+
+std::size_t EchoSendIntentServer::get_echo_rejected_session_count(std::size_t shard) const noexcept
+{
+	return this->echoes[shard]->get_rejected_session_count();
 }
 
 std::size_t EchoSendIntentServer::get_send_worker_count(void) const noexcept
@@ -131,8 +139,53 @@ void EchoSendIntentServer::on_client_leave(SessionID id) noexcept
 
 void EchoSendIntentServer::on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
 {
-	(void)id;
-	(void)packet;
+	// A session belongs to no group between on_client_join and the auth group's
+	// on_enter, and again between on_leave and the destination's on_enter. A
+	// conforming client sends nothing in the second window, but the first one
+	// opens before the client has heard anything at all -- so log what actually
+	// arrives here rather than guessing.
+	PacketType type;
+	std::size_t size;
+
+	this->orphan_recv_count.fetch_add(1, std::memory_order_relaxed);
+
+	size = packet->get_data_size();
+
+	type = static_cast<PacketType>(0);
+	if (size >= sizeof(type))
+		*packet >> type;
+
+	this->logger->log(
+		ajy::utility::Logger::LogLevel::Warning,
+		"on_recv(): packet arrived while the session belonged to no group. type: %u, size: %zu, id: %llu",
+		static_cast<unsigned int>(type),
+		size,
+		static_cast<unsigned long long>(id));
+}
+
+std::size_t EchoSendIntentServer::get_orphan_recv_count(void) const noexcept
+{
+	return this->orphan_recv_count.load(std::memory_order_relaxed);
+}
+
+std::size_t EchoSendIntentServer::get_orphan_join_count(void) const noexcept
+{
+	return this->orphan_join_count.load(std::memory_order_relaxed);
+}
+
+std::size_t EchoSendIntentServer::get_account_store_size(void) noexcept
+{
+	return this->accounts.get_size();
+}
+
+std::size_t EchoSendIntentServer::get_echo_account_miss_count(std::size_t shard) const noexcept
+{
+	return this->echoes[shard]->get_account_miss_count();
+}
+
+std::size_t EchoSendIntentServer::get_echo_stale_enter_count(std::size_t shard) const noexcept
+{
+	return this->echoes[shard]->get_stale_enter_count();
 }
 
 void EchoSendIntentServer::on_send(SessionID id, std::size_t size) noexcept

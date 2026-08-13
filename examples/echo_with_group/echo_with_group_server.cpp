@@ -87,12 +87,12 @@ std::size_t EchoWithGroupServer::get_echo_group_count(void) const noexcept
 
 std::size_t EchoWithGroupServer::get_echo_job_pool_in_use(std::size_t shard) const noexcept
 {
-	return this->echoes[shard]->get_job_pool_in_use();
+	return this->echoes[shard]->get_queued_job_count();
 }
 
 std::size_t EchoWithGroupServer::get_auth_job_pool_in_use(void) const noexcept
 {
-	return this->auth.get_job_pool_in_use();
+	return this->auth.get_queued_job_count();
 }
 
 bool EchoWithGroupServer::on_connection_request(const char *ip, std::uint16_t port)

@@ -34,8 +34,7 @@
 
 namespace ajy::concurrency
 {
-	template <typename TServer>
-	class Group;
+	template <typename TServer> class Group;
 }
 
 namespace ajy::network::windows::iocp
@@ -83,6 +82,7 @@ namespace ajy::network::windows::iocp
 
 	private:
 		static constexpr std::uint16_t DEFAULT_MAX_PENDING_SENDS = 1024;
+		static constexpr std::size_t RECV_BUFFER_CAPACITY = 8192;
 		static constexpr std::size_t PENDING_SENDS_INITIAL_CAPACITY = 128;
 		static constexpr std::size_t SEND_BATCH_SIZE = 128;
 		static constexpr std::size_t PACKET_POOL_INITIAL_CAPACITY = 1024;
@@ -95,7 +95,7 @@ namespace ajy::network::windows::iocp
 			SOCKET socket;
 
 			OVERLAPPED recv_overlapped;
-			container::RingBuffer recv_buffer = container::RingBuffer(65535);
+			container::RingBuffer recv_buffer = container::RingBuffer(RECV_BUFFER_CAPACITY);
 
 			OVERLAPPED send_overlapped;
 			container::lockfree::Queue<std::shared_ptr<const Packet>> pending_sends =

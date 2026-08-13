@@ -41,6 +41,7 @@ public:
 	EchoGroup &operator=(EchoGroup &&other) = delete;
 
 	std::uint32_t get_session_count(void) const noexcept;
+	std::size_t get_account_miss_count(void) const noexcept;
 
 protected:
 	void on_enter(SessionID id) noexcept override;
@@ -52,6 +53,7 @@ private:
 	AccountStore &accounts;
 	SendWorkerPool &senders;
 	std::atomic<std::uint32_t> session_count;
+	std::atomic<std::size_t> account_miss_count;
 };
 
 #endif

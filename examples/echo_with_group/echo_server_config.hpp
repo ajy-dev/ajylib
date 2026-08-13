@@ -28,7 +28,7 @@ namespace EchoServerConfig
 	// --- Groups ---
 	// Echo work is sharded across this many groups, each with its own thread;
 	// echo sessions share no state, so the split is free.
-	inline constexpr std::size_t ECHO_GROUP_COUNT = 4;
+	inline constexpr std::size_t ECHO_GROUP_COUNT = 1;
 
 	inline constexpr std::uint32_t AUTH_GROUP_FPS = 30;
 	inline constexpr std::uint32_t ECHO_GROUP_FPS = 30;

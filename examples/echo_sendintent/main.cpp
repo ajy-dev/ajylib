@@ -106,7 +106,8 @@ int main(void)
 			(void)args;
 
 			for (i = 0; i < server.get_echo_group_count(); ++i)
-				std::printf("Echo[%zu]: %zu ", i, server.get_echo_job_pool_in_use(i));
+				std::printf("Echo[%zu]: %zu (rejected %zu) ", i,
+					server.get_echo_job_pool_in_use(i), server.get_echo_rejected_session_count(i));
 			std::printf("\n");
 
 			for (i = 0; i < server.get_send_worker_count(); ++i)
@@ -127,6 +128,26 @@ int main(void)
 
 			server.query_send_batching(completions_per_second, mean_size);
 			std::printf("Send completions/sec: %u, mean bytes: %zu\n", completions_per_second, mean_size);
+		});
+
+	console.register_command(
+		"group",
+		"losses",
+		"Shows where sessions or packets went missing.",
+		[&server](std::istringstream &args)
+		{
+			std::size_t i;
+
+			(void)args;
+
+			std::printf("orphan_recv: %zu, account_store: %zu\n",
+				server.get_orphan_recv_count(), server.get_account_store_size());
+
+			for (i = 0; i < server.get_echo_group_count(); ++i)
+				std::printf("Echo[%zu]: account_miss %zu, stale_enter %zu, rejected %zu\n", i,
+					server.get_echo_account_miss_count(i),
+					server.get_echo_stale_enter_count(i),
+					server.get_echo_rejected_session_count(i));
 		});
 
 	console.register_command(

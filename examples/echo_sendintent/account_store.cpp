@@ -82,3 +82,24 @@ void AccountStore::remove(SessionID id) noexcept
 		std::terminate();
 	}
 }
+
+std::size_t AccountStore::get_size(void) noexcept
+{
+	std::size_t size;
+
+	size = 0;
+
+	try
+	{
+		std::lock_guard<std::mutex> guard(this->lock);
+
+		size = this->accounts.size();
+	}
+	catch (const std::system_error &error)
+	{
+		std::fprintf(stderr, "AccountStore::get_size(): std::lock_guard(lock) failed: [Code: %d] %s\n", error.code().value(), error.what());
+		std::terminate();
+	}
+
+	return size;
+}

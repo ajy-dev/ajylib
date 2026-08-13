@@ -35,6 +35,11 @@ namespace ajy::concurrency
 	Group<TServer>::Group(TServer &server, std::uint32_t fps) noexcept
 		: server(server)
 		, frame_interval(calculate_frame_interval(fps))
+		, jobs(JOB_QUEUE_CAPACITY)
+		, rejected_session_count(0)
+		, stale_enter_count(0)
+		, reject_reported(false)
+		, backlog_reported(false)
 		, frame_count(0)
 		, last_frame_tps(0)
 		, last_frame_query(ServerClock::now())
@@ -51,20 +56,19 @@ namespace ajy::concurrency
 	template <typename TServer>
 	void Group<TServer>::post_enter(SessionID id) noexcept
 	{
-		Job *job;
+		std::size_t size;
 
-		job = this->job_pool.create(JobType::Enter, id);
-		if (!job)
+		if (!this->jobs.enqueue(Job(JobType::Enter, id)))
 		{
-			std::fprintf(stderr, "Group::post_enter(): job_pool.create() failed.\n");
-			std::terminate();
+			this->reject_session("post_enter", id);
+			return;
 		}
 
-		if (!this->jobs.enqueue(job))
-		{
-			std::fprintf(stderr, "Group::post_enter(): jobs.enqueue() failed.\n");
-			std::terminate();
-		}
+		this->server.set_session_group(id, this);
+
+		size = this->jobs.get_size();
+		if (size > QUEUE_WARNING_THRESHOLD)
+			this->report_backlog("post_enter", size);
 
 		this->wake_thread();
 	}
@@ -72,20 +76,17 @@ namespace ajy::concurrency
 	template <typename TServer>
 	void Group<TServer>::post_leave(SessionID id) noexcept
 	{
-		Job *job;
+		std::size_t size;
 
-		job = this->job_pool.create(JobType::Leave, id);
-		if (!job)
+		if (!this->jobs.enqueue(Job(JobType::Leave, id)))
 		{
-			std::fprintf(stderr, "Group::post_leave(): job_pool.create() failed.\n");
-			std::terminate();
+			this->reject_session("post_leave", id);
+			return;
 		}
 
-		if (!this->jobs.enqueue(job))
-		{
-			std::fprintf(stderr, "Group::post_leave(): jobs.enqueue() failed.\n");
-			std::terminate();
-		}
+		size = this->jobs.get_size();
+		if (size > QUEUE_WARNING_THRESHOLD)
+			this->report_backlog("post_leave", size);
 
 		this->wake_thread();
 	}
@@ -93,20 +94,17 @@ namespace ajy::concurrency
 	template <typename TServer>
 	void Group<TServer>::post_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
 	{
-		Job *job;
+		std::size_t size;
 
-		job = this->job_pool.create(JobType::Recv, id, std::move(packet));
-		if (!job)
+		if (!this->jobs.enqueue(Job(JobType::Recv, id, std::move(packet))))
 		{
-			std::fprintf(stderr, "Group::post_recv(): job_pool.create() failed.\n");
-			std::terminate();
+			this->reject_session("post_recv", id);
+			return;
 		}
 
-		if (!this->jobs.enqueue(job))
-		{
-			std::fprintf(stderr, "Group::post_recv(): jobs.enqueue() failed.\n");
-			std::terminate();
-		}
+		size = this->jobs.get_size();
+		if (size > QUEUE_WARNING_THRESHOLD)
+			this->report_backlog("post_recv", size);
 
 		this->wake_thread();
 	}
@@ -117,17 +115,33 @@ namespace ajy::concurrency
 	}
 
 	template <typename TServer>
-	std::size_t Group<TServer>::get_job_pool_in_use(void) const noexcept
+	std::size_t Group<TServer>::get_queued_job_count(void) const noexcept
 	{
-		return this->job_pool.get_in_use_count();
+		return this->jobs.get_size();
+	}
+
+	template <typename TServer>
+	std::size_t Group<TServer>::get_rejected_session_count(void) const noexcept
+	{
+		return this->rejected_session_count.load(std::memory_order_relaxed);
+	}
+
+	template <typename TServer>
+	std::size_t Group<TServer>::get_stale_enter_count(void) const noexcept
+	{
+		return this->stale_enter_count.load(std::memory_order_relaxed);
 	}
 
 	template <typename TServer>
 	void Group<TServer>::move_session(SessionID id, Group &destination) noexcept
 	{
-		if (!this->sessions.erase(id))
+		std::uint32_t index;
+
+		index = unpack_index(id);
+		if (this->session_generations[index] != unpack_generation(id))
 			return;
 
+		this->session_generations[index] = EMPTY_GENERATION;
 		this->on_leave(id);
 		this->server.set_session_group(id, nullptr);
 		destination.post_enter(id);
@@ -139,6 +153,20 @@ namespace ajy::concurrency
 		, session_id(session_id)
 		, packet(std::move(packet))
 	{
+	}
+
+	template <typename TServer>
+	std::uint32_t Group<TServer>::unpack_index(SessionID id) noexcept
+	{
+		return static_cast<std::uint32_t>(id);
+	}
+
+	template <typename TServer>
+	std::uint32_t Group<TServer>::unpack_generation(SessionID id) noexcept
+	{
+		static constexpr unsigned int GENERATION_SHIFT = 32;
+
+		return static_cast<std::uint32_t>(id >> GENERATION_SHIFT);
 	}
 
 	template <typename TServer>
@@ -247,10 +275,20 @@ namespace ajy::concurrency
 	}
 
 	template <typename TServer>
-	void Group<TServer>::start(void) noexcept
+	void Group<TServer>::start(std::uint32_t max_sessions) noexcept
 	{
 		if (this->thread.joinable())
 			return;
+
+		try
+		{
+			this->session_generations.assign(max_sessions, EMPTY_GENERATION);
+		}
+		catch (const std::bad_alloc &error)
+		{
+			std::fprintf(stderr, "Group::start(): std::vector::assign(session_generations) failed: %s\n", error.what());
+			std::terminate();
+		}
 
 		this->running.store(true, std::memory_order_relaxed);
 
@@ -289,46 +327,105 @@ namespace ajy::concurrency
 	template <typename TServer>
 	void Group<TServer>::drain_jobs(void) noexcept
 	{
-		std::optional<Job *> job;
+		std::optional<Job> dequeued;
 
-		while ((job = this->jobs.dequeue()).has_value())
+		while ((dequeued = this->jobs.dequeue()).has_value())
 		{
+			Job *job;
 			SessionID id;
+			std::uint32_t index;
+			std::uint32_t generation;
 
-			id = job.value()->session_id;
+			job = &*dequeued;
 
-			switch (job.value()->type)
+			id = job->session_id;
+			index = unpack_index(id);
+			generation = unpack_generation(id);
+
+			switch (job->type)
 			{
 			case JobType::Enter:
+				// The session died between post_enter and here, so neither the
+				// membership record nor on_enter should be created. Counting it
+				// separates "the move raced a disconnect" from other losses.
 				if (!this->server.set_session_group(id, this))
+				{
+					this->stale_enter_count.fetch_add(1, std::memory_order_relaxed);
 					break;
-
-				try
-				{
-					this->sessions.insert(id);
-				}
-				catch (const std::bad_alloc &error)
-				{
-					std::fprintf(stderr, "Group::drain_jobs(): std::unordered_set::insert failed: %s\n", error.what());
-					std::terminate();
 				}
 
+				this->session_generations[index] = generation;
 				this->on_enter(id);
 				break;
 
 			case JobType::Leave:
-				if (this->sessions.erase(id))
-					this->on_leave(id);
+				if (this->session_generations[index] != generation)
+					break;
+
+				this->session_generations[index] = EMPTY_GENERATION;
+				this->on_leave(id);
 				break;
 
 			case JobType::Recv:
-				if (this->sessions.count(id))
-					this->on_recv(id, std::move(job.value()->packet));
+				if (this->session_generations[index] != generation)
+					break;
+
+				this->on_recv(id, std::move(job->packet));
 				break;
 			}
-
-			this->job_pool.destroy(job.value());
 		}
+
+		this->reject_reported.store(false, std::memory_order_relaxed);
+		this->backlog_reported.store(false, std::memory_order_relaxed);
+	}
+
+	template <typename TServer>
+	void Group<TServer>::reject_session(const char *function_name, SessionID id) noexcept
+	{
+		utility::Logger *logger;
+		std::size_t previous;
+
+		this->server.disconnect(id);
+
+		previous = this->rejected_session_count.fetch_add(1, std::memory_order_relaxed);
+
+		if (previous / REJECT_LOG_INTERVAL == (previous + 1) / REJECT_LOG_INTERVAL)
+			return;
+
+		if (this->reject_reported.exchange(true, std::memory_order_relaxed))
+			return;
+
+		logger = utility::Logger::get(LOGGER_NAME);
+		if (!logger)
+			return;
+
+		logger->log(
+			utility::Logger::LogLevel::Error,
+			"%s(): job queue full, disconnecting. rejected: %zu, capacity: %zu, id: %llu",
+			function_name,
+			previous + 1,
+			this->jobs.get_capacity(),
+			static_cast<unsigned long long>(id));
+	}
+
+	template <typename TServer>
+	void Group<TServer>::report_backlog(const char *function_name, std::size_t size) noexcept
+	{
+		utility::Logger *logger;
+
+		if (this->backlog_reported.exchange(true, std::memory_order_relaxed))
+			return;
+
+		logger = utility::Logger::get(LOGGER_NAME);
+		if (!logger)
+			return;
+
+		logger->log(
+			utility::Logger::LogLevel::Warning,
+			"%s(): job queue backlog over threshold. size: %zu, capacity: %zu",
+			function_name,
+			size,
+			this->jobs.get_capacity());
 	}
 
 	template <typename TServer>

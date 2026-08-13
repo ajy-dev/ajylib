@@ -182,7 +182,7 @@ namespace ajy::network::windows::iocp
 		this->running.store(true, std::memory_order_release);
 
 		for (concurrency::Group<Server> *group : this->groups)
-			group->start();
+			group->start(max_sessions);
 
 		try
 		{
@@ -619,8 +619,9 @@ clean_wsa:
 			server->accept_count.fetch_add(1, std::memory_order_relaxed);
 			server->active_session_count.fetch_add(1, std::memory_order_relaxed);
 			session->ref_count.fetch_add(1, std::memory_order_relaxed);
-			if (server->recv_post(session))
-				server->on_client_join(server->pack_session_id(index.value(), session->generation.load(std::memory_order_relaxed)));
+			
+			server->on_client_join(server->pack_session_id(index.value(), session->generation.load(std::memory_order_relaxed)));
+			server->recv_post(session);
 			server->release_session(session);
 		}
 	}

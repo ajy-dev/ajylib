@@ -17,8 +17,8 @@
 #ifndef AJY_CONCURRENCY_GROUP_HPP
 #define AJY_CONCURRENCY_GROUP_HPP
 
-#include <ajy/container/lockfree/queue.hpp>
-#include <ajy/memory/lockfree/memory_pool.hpp>
+#include <ajy/concurrency/ring_queue.hpp>
+#include <ajy/utility/logger.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -28,7 +28,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <unordered_set>
+#include <vector>
 
 namespace ajy::concurrency
 {
@@ -53,7 +53,9 @@ namespace ajy::concurrency
 		void post_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept;
 
 		std::uint32_t get_frame_tps(void) noexcept;
-		std::size_t get_job_pool_in_use(void) const noexcept;
+		std::size_t get_queued_job_count(void) const noexcept;
+		std::size_t get_rejected_session_count(void) const noexcept;
+		std::size_t get_stale_enter_count(void) const noexcept;
 
 	protected:
 		virtual void on_enter(SessionID id) noexcept = 0;
@@ -67,6 +69,14 @@ namespace ajy::concurrency
 
 	private:
 		friend TServer;
+
+		// TEMPORARY: hardcoded so the group can log without a signature change.
+		// Whichever example is under test creates a Logger under this name.
+		static constexpr const char *LOGGER_NAME = "echo_sendintent";
+
+		static constexpr std::size_t JOB_QUEUE_CAPACITY = 1048576;
+		static constexpr std::size_t REJECT_LOG_INTERVAL = 65535;
+		static constexpr std::size_t QUEUE_WARNING_THRESHOLD = 65535;
 
 		enum class JobType
 		{
@@ -84,6 +94,9 @@ namespace ajy::concurrency
 			Job(JobType type, SessionID session_id, std::unique_ptr<Packet> packet = nullptr) noexcept;
 		};
 
+		static std::uint32_t unpack_index(SessionID id) noexcept;
+		static std::uint32_t unpack_generation(SessionID id) noexcept;
+
 		static typename ServerClock::duration calculate_frame_interval(std::uint32_t fps) noexcept;
 
 		static std::uint32_t calculate_tps(
@@ -93,8 +106,11 @@ namespace ajy::concurrency
 
 		static void thread_proc(Group *group) noexcept;
 
-		void start(void) noexcept;
+		void start(std::uint32_t max_sessions) noexcept;
 		void stop(void) noexcept;
+
+		void reject_session(const char *function_name, SessionID id) noexcept;
+		void report_backlog(const char *function_name, std::size_t size) noexcept;
 
 		void drain_jobs(void) noexcept;
 		void wake_thread(void) noexcept;
@@ -105,10 +121,16 @@ namespace ajy::concurrency
 		std::atomic<std::uint32_t> last_frame_tps;
 		std::atomic<typename ServerClock::time_point> last_frame_query;
 
-		container::lockfree::Queue<Job *> jobs;
-		memory::lockfree::MemoryPool<Job> job_pool;
+		RingQueue<Job> jobs;
 
-		std::unordered_set<SessionID> sessions;
+		std::atomic<std::size_t> rejected_session_count;
+		std::atomic<std::size_t> stale_enter_count;
+		std::atomic<bool> reject_reported;
+		std::atomic<bool> backlog_reported;
+
+		static constexpr std::uint32_t EMPTY_GENERATION = ~static_cast<std::uint32_t>(0);
+
+		std::vector<std::uint32_t> session_generations;
 
 		std::mutex mutex;
 		std::condition_variable condition;
