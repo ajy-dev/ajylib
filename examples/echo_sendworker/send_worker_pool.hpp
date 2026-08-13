@@ -2,14 +2,14 @@
  * File: send_worker_pool.hpp
  * Path: ajylib/examples/echo_sendworker/send_worker_pool.hpp
  * Description:
- *	Moves send_packet off the group threads, so that no WSASend syscall is
- *	issued from a group thread.
+ *	Takes a built packet and issues the send call on its own threads.
  * Note:
- *	Throwaway measurement scaffolding, not a library candidate: it exists to
- *	size how much of a group thread's per-packet cost is the send syscall.
+ *	Measurement scaffolding. The group thread still allocates and serializes;
+ *	only send_packet leaves it. Pairs with echo_sendintent, which also moves
+ *	allocation and serialization off the group thread.
  *	A session is pinned to one worker so its packets keep their order.
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -24,7 +24,6 @@
 #include <cstddef>
 #include <memory>
 #include <thread>
-#include <utility>
 #include <vector>
 
 class SendWorkerPool
@@ -50,7 +49,11 @@ public:
 	bool is_queue_empty(std::size_t worker) const noexcept;
 
 private:
-	using Job = std::pair<SessionID, std::shared_ptr<Packet>>;
+	struct Job
+	{
+		SessionID session_id;
+		std::shared_ptr<Packet> packet;
+	};
 
 	struct Worker
 	{
@@ -60,6 +63,8 @@ private:
 	};
 
 	static void thread_proc(SendWorkerPool *pool, Worker *worker) noexcept;
+
+	void dispatch(Job &job) noexcept;
 
 	ajy::network::windows::iocp::NetServer &server;
 	std::vector<std::unique_ptr<Worker>> workers;

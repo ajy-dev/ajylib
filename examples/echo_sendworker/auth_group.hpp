@@ -10,7 +10,7 @@
  *	this example gates on packet shape only. The destination echo group is
  *	picked by SessionID so a session always lands on the same shard.
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -24,7 +24,6 @@
 #include <ajy/concurrency/group.hpp>
 #include <ajy/network/windows/iocp/net_server.hpp>
 
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -45,8 +44,6 @@ public:
 	AuthGroup(AuthGroup &&other) = delete;
 	AuthGroup &operator=(AuthGroup &&other) = delete;
 
-	std::uint32_t get_session_count(void) const noexcept;
-
 protected:
 	void on_enter(SessionID id) noexcept override;
 	void on_leave(SessionID id) noexcept override;
@@ -58,7 +55,6 @@ private:
 
 	std::vector<std::unique_ptr<EchoGroup>> &echoes;
 	AccountStore &accounts;
-	std::atomic<std::uint32_t> session_count;
 };
 
 #endif

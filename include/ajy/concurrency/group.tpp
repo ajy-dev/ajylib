@@ -5,7 +5,7 @@
  * 	A serial processing unit definition.
  * Author: ajy-dev
  * Created: 2026-08-10
- * Updated: Never
+ * Updated: 2026-08-14
  * Version: 0.1.0
  */
 
@@ -35,14 +35,17 @@ namespace ajy::concurrency
 	Group<TServer>::Group(TServer &server, std::uint32_t fps) noexcept
 		: server(server)
 		, frame_interval(calculate_frame_interval(fps))
+		, frame_count(0)
+		, last_frame_tps(0)
+		, last_frame_query(ServerClock::now())
 		, jobs(JOB_QUEUE_CAPACITY)
 		, rejected_session_count(0)
 		, stale_enter_count(0)
 		, reject_reported(false)
 		, backlog_reported(false)
-		, frame_count(0)
-		, last_frame_tps(0)
-		, last_frame_query(ServerClock::now())
+		, session_count(0)
+		, enter_count(0)
+		, leave_count(0)
 		, wake(false)
 		, running(false)
 	{
@@ -133,15 +136,38 @@ namespace ajy::concurrency
 	}
 
 	template <typename TServer>
+	std::uint64_t Group<TServer>::get_session_count(void) const noexcept
+	{
+		return this->session_count.load(std::memory_order_relaxed);
+	}
+
+	template <typename TServer>
+	std::uint64_t Group<TServer>::get_enter_count(void) const noexcept
+	{
+		return this->enter_count.load(std::memory_order_relaxed);
+	}
+
+	template <typename TServer>
+	std::uint64_t Group<TServer>::get_leave_count(void) const noexcept
+	{
+		return this->leave_count.load(std::memory_order_relaxed);
+	}
+
+	template <typename TServer>
 	void Group<TServer>::move_session(SessionID id, Group &destination) noexcept
 	{
 		std::uint32_t index;
 
 		index = unpack_index(id);
+		if (index >= this->session_generations.size())
+			return;
+
 		if (this->session_generations[index] != unpack_generation(id))
 			return;
 
 		this->session_generations[index] = EMPTY_GENERATION;
+		this->session_count.fetch_sub(1, std::memory_order_relaxed);
+		this->leave_count.fetch_add(1, std::memory_order_relaxed);
 		this->on_leave(id);
 		this->server.set_session_group(id, nullptr);
 		destination.post_enter(id);
@@ -355,6 +381,8 @@ namespace ajy::concurrency
 				}
 
 				this->session_generations[index] = generation;
+				this->session_count.fetch_add(1, std::memory_order_relaxed);
+				this->enter_count.fetch_add(1, std::memory_order_relaxed);
 				this->on_enter(id);
 				break;
 
@@ -363,6 +391,8 @@ namespace ajy::concurrency
 					break;
 
 				this->session_generations[index] = EMPTY_GENERATION;
+				this->session_count.fetch_sub(1, std::memory_order_relaxed);
+				this->leave_count.fetch_add(1, std::memory_order_relaxed);
 				this->on_leave(id);
 				break;
 

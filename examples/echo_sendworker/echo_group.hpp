@@ -2,11 +2,11 @@
  * File: echo_group.hpp
  * Path: ajylib/examples/echo_sendworker/echo_group.hpp
  * Description:
- *	The content group of the echo_sendworker example. Identical to
- *	echo_with_group's, except that finished packets go to a SendWorkerPool
- *	instead of NetServer::send_packet.
+ *	The content group of the echo_sendworker example. It builds the reply
+ *	packet itself and hands it to a SendWorkerPool, so only the send call
+ *	leaves the group thread.
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -40,7 +40,7 @@ public:
 	EchoGroup(EchoGroup &&other) = delete;
 	EchoGroup &operator=(EchoGroup &&other) = delete;
 
-	std::uint32_t get_session_count(void) const noexcept;
+	std::size_t get_account_miss_count(void) const noexcept;
 
 protected:
 	void on_enter(SessionID id) noexcept override;
@@ -54,7 +54,7 @@ private:
 
 	AccountStore &accounts;
 	SendWorkerPool &senders;
-	std::atomic<std::uint32_t> session_count;
+	std::atomic<std::size_t> account_miss_count;
 };
 
 #endif

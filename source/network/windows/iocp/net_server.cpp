@@ -5,7 +5,7 @@
  *	A Windows IOCP obfuscated-protocol TCP server definition.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: 2026-07-21
+ * Updated: 2026-08-14
  * Version: 0.1.0
  */
 
@@ -564,6 +564,36 @@ clean_wsa:
 		return true;
 	}
 
+	std::uint32_t NetServer::get_max_sessions(void) const noexcept
+	{
+		return this->max_sessions;
+	}
+
+	bool NetServer::get_session_info(std::uint32_t index, SessionInfo &info) const noexcept
+	{
+		const Session *session;
+		int ref_count;
+
+		if (!this->sessions || index >= this->max_sessions)
+			return false;
+
+		session = &this->sessions[index];
+
+		ref_count = session->ref_count.load(std::memory_order_relaxed);
+		if (!ref_count)
+			return false;
+
+		info.id = this->pack_session_id(index, session->generation.load(std::memory_order_relaxed));
+		info.ref_count = ref_count;
+		info.pending_send_count = session->pending_send_count.load(std::memory_order_relaxed);
+		info.socket_valid = session->socket != INVALID_SOCKET;
+		info.send_flag = session->send_flag.load(std::memory_order_relaxed);
+		info.disconnect_flag = session->disconnect_flag.load(std::memory_order_relaxed);
+		info.has_group = session->group.load(std::memory_order_relaxed) != nullptr;
+
+		return true;
+	}
+
 	void NetServer::accept_thread_proc(NetServer *server) noexcept
 	{
 		SOCKADDR_IN addr;
@@ -935,13 +965,16 @@ clean_wsa:
 			session->send_flag.store(false, std::memory_order_relaxed);
 			session->disconnect_flag.store(false, std::memory_order_relaxed);
 
+			// post_leave must precede the slot release. Once the index is back in
+			// free_indices, accept may reuse it and post the new session's Enter
+			// ahead of this Leave, leaving the departing membership unresolved.
+			if (group)
+				group->post_leave(id);
+
 			if (!this->free_indices.push(session->index))
 				this->logger->log(utility::Logger::LogLevel::Error, "free_indices.push() failed. Slot lost. index: %u", session->index);
 
 			this->active_session_count.fetch_sub(1, std::memory_order_relaxed);
-
-			if (group)
-				group->post_leave(id);
 
 			this->on_client_leave(id);
 		}

@@ -6,7 +6,7 @@
  *	syscall.
  * Author: ajy-dev
  * Created: 2026-08-10
- * Updated: Never
+ * Updated: 2026-08-14
  * Version: 0.1.0
  */
 
@@ -89,9 +89,34 @@ std::uint32_t EchoSendIntentServer::get_echo_frame_tps(std::size_t shard) noexce
 	return this->echoes[shard]->get_frame_tps();
 }
 
-std::uint32_t EchoSendIntentServer::get_echo_session_count(std::size_t shard) const noexcept
+std::uint64_t EchoSendIntentServer::get_auth_session_count(void) const noexcept
+{
+	return this->auth.get_session_count();
+}
+
+std::uint64_t EchoSendIntentServer::get_auth_enter_count(void) const noexcept
+{
+	return this->auth.get_enter_count();
+}
+
+std::uint64_t EchoSendIntentServer::get_auth_leave_count(void) const noexcept
+{
+	return this->auth.get_leave_count();
+}
+
+std::uint64_t EchoSendIntentServer::get_echo_session_count(std::size_t shard) const noexcept
 {
 	return this->echoes[shard]->get_session_count();
+}
+
+std::uint64_t EchoSendIntentServer::get_echo_enter_count(std::size_t shard) const noexcept
+{
+	return this->echoes[shard]->get_enter_count();
+}
+
+std::uint64_t EchoSendIntentServer::get_echo_leave_count(std::size_t shard) const noexcept
+{
+	return this->echoes[shard]->get_leave_count();
 }
 
 std::size_t EchoSendIntentServer::get_echo_group_count(void) const noexcept

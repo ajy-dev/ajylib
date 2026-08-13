@@ -9,7 +9,7 @@
  *	LOG_LEVEL below is hardcoded for quick editing.
  * Author: ajy-dev
  * Created: 2026-08-10
- * Updated: Never
+ * Updated: 2026-08-14
  * Version: 0.1.0
  */
 
@@ -80,19 +80,107 @@ int main(void)
 			std::printf("\n");
 		});
 
+	// --- Temporary diagnostics. Remove once the stuck-session cause is settled. ---
 	console.register_command(
-		"group",
-		"session_count",
-		"Shows the session count of each group.",
+		"server",
+		"sessions",
+		"Lists every slot still held by the server, and why.\n"
+		"  ref     outstanding references; a slot is freed only when this reaches 0\n"
+		"  sock    socket still open\n"
+		"  send    a WSASend is outstanding\n"
+		"  pend    packets queued for send\n"
+		"  disc    disconnect was requested but the slot was never reclaimed\n"
+		"  grp     the session still belongs to a group",
 		[&server](std::istringstream &args)
 		{
-			std::size_t i;
+			std::size_t held;
 
 			(void)args;
 
-			for (i = 0; i < server.get_echo_group_count(); ++i)
-				std::printf("Echo[%zu]: %u ", i, server.get_echo_session_count(i));
-			std::printf("\n");
+			held = 0;
+
+			for (std::uint32_t i = 0; i < server.get_max_sessions(); ++i)
+			{
+				EchoSendIntentServer::SessionInfo info;
+
+				if (!server.get_session_info(i, info))
+					continue;
+
+				std::printf(
+					"idx %5u  id %20llu  ref %d  sock %c  send %c  pend %u  disc %c  grp %c\n",
+					i,
+					static_cast<unsigned long long>(info.id),
+					info.ref_count,
+					info.socket_valid ? 'T' : 'F',
+					info.send_flag ? 'T' : 'F',
+					static_cast<unsigned>(info.pending_send_count),
+					info.disconnect_flag ? 'T' : 'F',
+					info.has_group ? 'T' : 'F');
+
+				++held;
+			}
+
+			std::printf("%zu session(s) held.\n", held);
+		});
+
+	console.register_command(
+		"group",
+		"session_count",
+		"Shows every group's live session count and its cumulative enter/leave.\n"
+		"  gap = group total - server total. A negative gap is normal (a session is\n"
+		"  unaffiliated between accept and enter, and while moving between groups).\n"
+		"  A positive gap means a membership outlived its session.",
+		[&server](std::istringstream &args)
+		{
+			std::uint64_t total_live;
+			std::uint64_t total_enter;
+			std::uint64_t total_leave;
+			std::uint32_t server_live;
+			std::int64_t gap;
+
+			(void)args;
+
+			total_live = server.get_auth_session_count();
+			total_enter = server.get_auth_enter_count();
+			total_leave = server.get_auth_leave_count();
+
+			std::printf(
+				"Auth:    live %llu, enter %llu, leave %llu\n",
+				static_cast<unsigned long long>(total_live),
+				static_cast<unsigned long long>(total_enter),
+				static_cast<unsigned long long>(total_leave));
+
+			for (std::size_t i = 0; i < server.get_echo_group_count(); ++i)
+			{
+				std::uint64_t live;
+				std::uint64_t enter;
+				std::uint64_t leave;
+
+				live = server.get_echo_session_count(i);
+				enter = server.get_echo_enter_count(i);
+				leave = server.get_echo_leave_count(i);
+
+				std::printf(
+					"Echo[%zu]: live %llu, enter %llu, leave %llu\n",
+					i,
+					static_cast<unsigned long long>(live),
+					static_cast<unsigned long long>(enter),
+					static_cast<unsigned long long>(leave));
+
+				total_live += live;
+				total_enter += enter;
+				total_leave += leave;
+			}
+
+			server_live = server.get_session_count();
+			gap = static_cast<std::int64_t>(total_live) - static_cast<std::int64_t>(server_live);
+
+			std::printf(
+				"Groups:  live %llu, enter %llu, leave %llu\n",
+				static_cast<unsigned long long>(total_live),
+				static_cast<unsigned long long>(total_enter),
+				static_cast<unsigned long long>(total_leave));
+			std::printf("Server:  live %u, gap %+lld\n", server_live, static_cast<long long>(gap));
 		});
 
 	console.register_command(

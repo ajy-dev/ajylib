@@ -10,7 +10,7 @@
  *	the send path.
  * Author: ajy-dev
  * Created: 2026-08-10
- * Updated: Never
+ * Updated: 2026-08-14
  * Version: 0.1.0
  */
 
@@ -48,7 +48,12 @@ public:
 
 	std::uint32_t get_auth_frame_tps(void) noexcept;
 	std::uint32_t get_echo_frame_tps(std::size_t shard) noexcept;
-	std::uint32_t get_echo_session_count(std::size_t shard) const noexcept;
+	std::uint64_t get_auth_session_count(void) const noexcept;
+	std::uint64_t get_auth_enter_count(void) const noexcept;
+	std::uint64_t get_auth_leave_count(void) const noexcept;
+	std::uint64_t get_echo_session_count(std::size_t shard) const noexcept;
+	std::uint64_t get_echo_enter_count(std::size_t shard) const noexcept;
+	std::uint64_t get_echo_leave_count(std::size_t shard) const noexcept;
 	std::size_t get_echo_group_count(void) const noexcept;
 	std::size_t get_echo_job_pool_in_use(std::size_t shard) const noexcept;
 	std::size_t get_echo_rejected_session_count(std::size_t shard) const noexcept;

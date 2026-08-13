@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server definition.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-21
+ * Updated: 2026-08-14
  * Version: 0.1.0
  */
 
@@ -892,13 +892,16 @@ clean_wsa:
 			session->send_flag.store(false, std::memory_order_relaxed);
 			session->disconnect_flag.store(false, std::memory_order_relaxed);
 
+			// post_leave must precede the slot release. Once the index is back in
+			// free_indices, accept may reuse it and post the new session's Enter
+			// ahead of this Leave, leaving the departing membership unresolved.
+			if (group)
+				group->post_leave(id);
+
 			if (!this->free_indices.push(session->index))
 				this->logger->log(utility::Logger::LogLevel::Error, "free_indices.push() failed. Slot lost. index: %u", session->index);
 
 			this->active_session_count.fetch_sub(1, std::memory_order_relaxed);
-
-			if (group)
-				group->post_leave(id);
 
 			this->on_client_leave(id);
 		}

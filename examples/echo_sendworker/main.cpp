@@ -1,14 +1,14 @@
 /**
  * File: main.cpp
- * Path: ajylib/examples/echo_with_group/main.cpp
+ * Path: ajylib/examples/echo_sendworker/main.cpp
  * Description:
- *	Entry point for the echo_with_group example. Drives the server through
+ *	Entry point for the echo_sendworker example. Drives the server through
  *	an interactive management console; type 'help' for available commands,
  *	'exit' to quit.
  * Note:
  *	LOG_LEVEL below is hardcoded for quick editing.
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -40,7 +40,10 @@ int main(void)
 	std::size_t logger_index;
 	ajy::utility::Logger *logger;
 
-	logger_index = ajy::utility::Logger::create("echo_sendworker");
+	// Group::LOGGER_NAME is hardcoded to "echo_sendintent", so this example
+	// must register under that name or the group's backlog and reject
+	// warnings resolve to a null logger and vanish.
+	logger_index = ajy::utility::Logger::create("echo_sendintent");
 	if (logger_index >= ajy::utility::Logger::INVALID_INDEX)
 	{
 		std::fprintf(stderr, "Logger::create() failed.\n");
@@ -57,7 +60,7 @@ int main(void)
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemAvailableMemoryProbe>("system_available_mem_mb"));
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemNonpagedMemoryProbe>("system_nonpaged_mem_mb"));
 
-	EchoSendWorkerServer server("echo_sendworker");
+	EchoSendWorkerServer server("echo_sendintent");
 	ajy::utility::Console console;
 	MonitorReporter reporter(monitor);
 
@@ -83,16 +86,61 @@ int main(void)
 	console.register_command(
 		"group",
 		"session_count",
-		"Shows the session count of each group.",
+		"Shows every group's live session count and its cumulative enter/leave.\n"
+		"  gap = group total - server total. A negative gap is normal (a session is\n"
+		"  unaffiliated between accept and enter, and while moving between groups).\n"
+		"  A positive gap means a membership outlived its session.",
 		[&server](std::istringstream &args)
 		{
-			std::size_t i;
+			std::uint64_t total_live;
+			std::uint64_t total_enter;
+			std::uint64_t total_leave;
+			std::uint32_t server_live;
+			std::int64_t gap;
 
 			(void)args;
 
-			for (i = 0; i < server.get_echo_group_count(); ++i)
-				std::printf("Echo[%zu]: %u ", i, server.get_echo_session_count(i));
-			std::printf("\n");
+			total_live = server.get_auth_session_count();
+			total_enter = server.get_auth_enter_count();
+			total_leave = server.get_auth_leave_count();
+
+			std::printf(
+				"Auth:    live %llu, enter %llu, leave %llu\n",
+				static_cast<unsigned long long>(total_live),
+				static_cast<unsigned long long>(total_enter),
+				static_cast<unsigned long long>(total_leave));
+
+			for (std::size_t i = 0; i < server.get_echo_group_count(); ++i)
+			{
+				std::uint64_t live;
+				std::uint64_t enter;
+				std::uint64_t leave;
+
+				live = server.get_echo_session_count(i);
+				enter = server.get_echo_enter_count(i);
+				leave = server.get_echo_leave_count(i);
+
+				std::printf(
+					"Echo[%zu]: live %llu, enter %llu, leave %llu\n",
+					i,
+					static_cast<unsigned long long>(live),
+					static_cast<unsigned long long>(enter),
+					static_cast<unsigned long long>(leave));
+
+				total_live += live;
+				total_enter += enter;
+				total_leave += leave;
+			}
+
+			server_live = server.get_session_count();
+			gap = static_cast<std::int64_t>(total_live) - static_cast<std::int64_t>(server_live);
+
+			std::printf(
+				"Groups:  live %llu, enter %llu, leave %llu\n",
+				static_cast<unsigned long long>(total_live),
+				static_cast<unsigned long long>(total_enter),
+				static_cast<unsigned long long>(total_leave));
+			std::printf("Server:  live %u, gap %+lld\n", server_live, static_cast<long long>(gap));
 		});
 
 	console.register_command(
@@ -106,7 +154,8 @@ int main(void)
 			(void)args;
 
 			for (i = 0; i < server.get_echo_group_count(); ++i)
-				std::printf("Echo[%zu]: %zu ", i, server.get_echo_job_pool_in_use(i));
+				std::printf("Echo[%zu]: %zu (rejected %zu) ", i,
+					server.get_echo_job_pool_in_use(i), server.get_echo_rejected_session_count(i));
 			std::printf("\n");
 
 			for (i = 0; i < server.get_send_worker_count(); ++i)
@@ -127,6 +176,26 @@ int main(void)
 
 			server.query_send_batching(completions_per_second, mean_size);
 			std::printf("Send completions/sec: %u, mean bytes: %zu\n", completions_per_second, mean_size);
+		});
+
+	console.register_command(
+		"group",
+		"losses",
+		"Shows where sessions or packets went missing.",
+		[&server](std::istringstream &args)
+		{
+			std::size_t i;
+
+			(void)args;
+
+			std::printf("orphan_recv: %zu, account_store: %zu\n",
+				server.get_orphan_recv_count(), server.get_account_store_size());
+
+			for (i = 0; i < server.get_echo_group_count(); ++i)
+				std::printf("Echo[%zu]: account_miss %zu, stale_enter %zu, rejected %zu\n", i,
+					server.get_echo_account_miss_count(i),
+					server.get_echo_stale_enter_count(i),
+					server.get_echo_rejected_session_count(i));
 		});
 
 	console.register_command(

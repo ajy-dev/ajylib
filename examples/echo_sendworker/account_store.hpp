@@ -9,7 +9,7 @@
  *	map is mutex-guarded; contention is negligible since each session
  *	touches it twice over its lifetime.
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -19,6 +19,7 @@
 
 #include <ajy/network/server.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <unordered_map>
@@ -39,6 +40,8 @@ public:
 	void put(SessionID id, std::int64_t account_no) noexcept;
 	bool take(SessionID id, std::int64_t &account_no) noexcept;
 	void remove(SessionID id) noexcept;
+
+	std::size_t get_size(void) noexcept;
 
 private:
 	std::unordered_map<SessionID, std::int64_t> accounts;

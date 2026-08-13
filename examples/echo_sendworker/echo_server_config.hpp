@@ -4,7 +4,7 @@
  * Description:
  *	Configuration constants for the echo_sendworker example
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -33,7 +33,7 @@ namespace EchoServerConfig
 	// --- Send workers ---
 	// Group threads hand finished packets here instead of calling
 	// send_packet themselves, so no WSASend is issued on a group thread.
-	inline constexpr std::size_t SEND_WORKER_COUNT = 8;
+	inline constexpr std::size_t SEND_WORKER_COUNT = 4;
 
 	// --- Wire payload sizes (protocol.hpp) ---
 	inline constexpr std::size_t REQ_LOGIN_SIZE = 78;

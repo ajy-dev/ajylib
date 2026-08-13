@@ -4,7 +4,7 @@
  * Description:
  *	Moves send_packet off the group threads.
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -96,7 +96,7 @@ void SendWorkerPool::post(SessionID id, std::shared_ptr<Packet> packet) noexcept
 
 	worker = this->workers[static_cast<std::size_t>(id) % this->workers.size()].get();
 
-	if (!worker->jobs.enqueue(Job(id, std::move(packet))))
+	if (!worker->jobs.enqueue(Job{id, std::move(packet)}))
 	{
 		std::fprintf(stderr, "SendWorkerPool::post(): jobs.enqueue() failed.\n");
 		std::terminate();
@@ -104,6 +104,11 @@ void SendWorkerPool::post(SessionID id, std::shared_ptr<Packet> packet) noexcept
 
 	if (!worker->wake.exchange(true, std::memory_order_release))
 		worker->wake.notify_one();
+}
+
+void SendWorkerPool::dispatch(Job &job) noexcept
+{
+	this->server.send_packet(job.session_id, std::move(job.packet));
 }
 
 std::size_t SendWorkerPool::get_worker_count(void) const noexcept
@@ -123,10 +128,14 @@ void SendWorkerPool::thread_proc(SendWorkerPool *pool, Worker *worker) noexcept
 		std::optional<Job> job;
 
 		worker->wake.wait(false, std::memory_order_acquire);
-		worker->wake.store(false, std::memory_order_relaxed);
 
 		while ((job = worker->jobs.dequeue()).has_value())
-			pool->server.send_packet(job.value().first, std::move(job.value().second));
+			pool->dispatch(job.value());
+
+		worker->wake.store(false, std::memory_order_release);
+
+		while ((job = worker->jobs.dequeue()).has_value())
+			pool->dispatch(job.value());
 	}
 
 	while (worker->jobs.dequeue().has_value())

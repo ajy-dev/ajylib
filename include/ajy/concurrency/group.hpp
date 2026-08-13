@@ -10,7 +10,7 @@
  * 	itself carries no network dependency.
  * Author: ajy-dev
  * Created: 2026-08-10
- * Updated: Never
+ * Updated: 2026-08-14
  * Version: 0.1.0
  */
 
@@ -56,6 +56,9 @@ namespace ajy::concurrency
 		std::size_t get_queued_job_count(void) const noexcept;
 		std::size_t get_rejected_session_count(void) const noexcept;
 		std::size_t get_stale_enter_count(void) const noexcept;
+		std::uint64_t get_session_count(void) const noexcept;
+		std::uint64_t get_enter_count(void) const noexcept;
+		std::uint64_t get_leave_count(void) const noexcept;
 
 	protected:
 		virtual void on_enter(SessionID id) noexcept = 0;
@@ -131,6 +134,9 @@ namespace ajy::concurrency
 		static constexpr std::uint32_t EMPTY_GENERATION = ~static_cast<std::uint32_t>(0);
 
 		std::vector<std::uint32_t> session_generations;
+		std::atomic<std::uint64_t> session_count;
+		std::atomic<std::uint64_t> enter_count;
+		std::atomic<std::uint64_t> leave_count;
 
 		std::mutex mutex;
 		std::condition_variable condition;

@@ -4,7 +4,7 @@
  * Description:
  *	The authentication group of the echo_sendworker example.
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -24,7 +24,6 @@ AuthGroup::AuthGroup(
 	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps)
 	, echoes(echoes)
 	, accounts(accounts)
-	, session_count(0)
 {
 }
 
@@ -32,23 +31,14 @@ AuthGroup::~AuthGroup(void) noexcept
 {
 }
 
-std::uint32_t AuthGroup::get_session_count(void) const noexcept
-{
-	return this->session_count.load(std::memory_order_relaxed);
-}
-
 void AuthGroup::on_enter(SessionID id) noexcept
 {
 	(void)id;
-
-	this->session_count.fetch_add(1, std::memory_order_relaxed);
 }
 
 void AuthGroup::on_leave(SessionID id) noexcept
 {
 	(void)id;
-
-	this->session_count.fetch_sub(1, std::memory_order_relaxed);
 }
 
 void AuthGroup::on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept

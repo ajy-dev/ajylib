@@ -79,6 +79,24 @@ namespace ajy::network::windows::iocp
 		void add_group(concurrency::Group<NetServer> &group) noexcept;
 		bool set_session_group(SessionID id, concurrency::Group<NetServer> *group) noexcept;
 
+		// --- Temporary diagnostics. Remove once the stuck-session cause is settled. ---
+		// Reports why a slot is still held. Every field but socket_valid is read
+		// from an atomic; socket_valid is a plain read and may tear while the
+		// server is under load, so trust it only on a quiesced server.
+		struct SessionInfo
+		{
+			SessionID id;
+			int ref_count;
+			std::uint16_t pending_send_count;
+			bool socket_valid;
+			bool send_flag;
+			bool disconnect_flag;
+			bool has_group;
+		};
+
+		std::uint32_t get_max_sessions(void) const noexcept;
+		bool get_session_info(std::uint32_t index, SessionInfo &info) const noexcept;
+
 	protected:
 		virtual bool on_connection_request(const char *ip, std::uint16_t port) = 0;
 		virtual void on_client_join(SessionID id) noexcept = 0;
