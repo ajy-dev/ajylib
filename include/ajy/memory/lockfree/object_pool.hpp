@@ -15,12 +15,12 @@
 #ifndef AJY_MEMORY_LOCKFREE_OBJECT_POOL_HPP
 #define AJY_MEMORY_LOCKFREE_OBJECT_POOL_HPP
 
-#include <ajy/container/lockfree/stack.hpp>
 #include <ajy/memory/concepts.hpp>
 #include <ajy/memory/lockfree/memory_pool.hpp>
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -47,9 +47,18 @@ namespace ajy::memory::lockfree
 		std::size_t get_in_use_count(void) const noexcept;
 
 	private:
+		static_assert(sizeof(std::uintptr_t) == 8, "Requires 64-bit platform");
+
+		static std::uintptr_t pack(T *ptr, std::uint16_t tag) noexcept;
+		static T *unpack_ptr(std::uintptr_t raw) noexcept;
+		static std::uint16_t unpack_tag(std::uintptr_t raw) noexcept;
+
+		void push(T *object) noexcept;
+		T *pop(void) noexcept;
+
 		std::tuple<Args...> ctor_args;
 		MemoryPool<T> storage;
-		container::lockfree::Stack<T *> free_objects;
+		std::atomic<std::uintptr_t> free_head;
 		std::atomic<std::size_t> in_use_count;
 	};
 }

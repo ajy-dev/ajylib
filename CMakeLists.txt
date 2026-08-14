@@ -83,6 +83,7 @@ target_sources(
 			include/ajy/container/lockfree/stack.hpp
 			include/ajy/container/lockfree/queue.hpp
 			include/ajy/memory/concepts.hpp
+			include/ajy/memory/pool_linked.hpp
 			include/ajy/memory/shared_types.hpp
 			include/ajy/memory/lockfree/memory_pool.hpp
 			include/ajy/memory/lockfree/object_pool.hpp

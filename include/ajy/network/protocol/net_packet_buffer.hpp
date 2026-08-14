@@ -22,7 +22,7 @@
  * 	data race. If a packet is pooled and reused, finalized must be reset.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: 2026-07-21
+ * Updated: 2026-08-14
  * Version: 0.1.0
  */
 
@@ -30,6 +30,7 @@
 #define AJY_NETWORK_PROTOCOL_NET_PACKET_BUFFER_HPP
 
 #include <ajy/container/serialization_buffer.hpp>
+#include <ajy/memory/pool_linked.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -37,7 +38,9 @@
 
 namespace ajy::network::protocol
 {
-	class NetPacketBuffer : public container::SerializationBuffer
+	class NetPacketBuffer
+		: public container::SerializationBuffer
+		, public memory::PoolLinked
 	{
 	public:
 		static constexpr std::size_t CODE_SIZE = sizeof(std::uint8_t);

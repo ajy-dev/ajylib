@@ -10,7 +10,7 @@
  *	2-byte header, since a larger payload could never be described by it.
  * Author: ajy-dev
  * Created: 2026-07-04
- * Updated: 2026-07-21
+ * Updated: 2026-08-14
  * Version: 0.1.0
  */
 
@@ -18,6 +18,7 @@
 #define AJY_NETWORK_PROTOCOL_PACKET_BUFFER_HPP
 
 #include <ajy/container/serialization_buffer.hpp>
+#include <ajy/memory/pool_linked.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -25,7 +26,9 @@
 
 namespace ajy::network::protocol
 {
-	class PacketBuffer : public container::SerializationBuffer
+	class PacketBuffer
+		: public container::SerializationBuffer
+		, public memory::PoolLinked
 	{
 	public:
 		static constexpr std::size_t HEADER_SIZE = sizeof(std::uint16_t);
