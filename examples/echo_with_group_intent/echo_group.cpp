@@ -1,11 +1,11 @@
 /**
  * File: echo_group.cpp
- * Path: ajylib/examples/echo_sendintent/echo_group.cpp
+ * Path: ajylib/examples/echo_with_group_intent/echo_group.cpp
  * Description:
- *	The content group of the echo_sendintent example.
+ *	The content group of the echo_with_group_intent example.
  * Author: ajy-dev
- * Created: 2026-08-10
- * Updated: 2026-08-14
+ * Created: 2026-08-14
+ * Updated: Never
  * Version: 0.1.0
  */
 
@@ -21,7 +21,7 @@ EchoGroup::EchoGroup(
 	AccountStore &accounts,
 	SendWorkerPool &senders,
 	std::uint32_t fps) noexcept
-	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps, "echo_sendintent")
+	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps, "echo_with_group_intent")
 	, accounts(accounts)
 	, senders(senders)
 	, account_miss_count(0)
@@ -89,4 +89,3 @@ void EchoGroup::on_frame(typename ServerClock::duration elapsed) noexcept
 {
 	(void)elapsed;
 }
-

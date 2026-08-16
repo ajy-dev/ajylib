@@ -4,7 +4,7 @@
  * Description:
  *	The content group of the echo_with_group example.
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -16,10 +16,15 @@
 
 #include <ajy/utility/logger.hpp>
 
-EchoGroup::EchoGroup(ajy::network::windows::iocp::NetServer &server, AccountStore &accounts, std::uint32_t fps) noexcept
-	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps)
+EchoGroup::EchoGroup(
+	ajy::network::windows::iocp::NetServer &server,
+	AccountStore &accounts,
+	SendWorkerPool &senders,
+	std::uint32_t fps) noexcept
+	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps, "echo_with_group")
 	, accounts(accounts)
-	, session_count(0)
+	, senders(senders)
+	, account_miss_count(0)
 {
 }
 
@@ -27,19 +32,22 @@ EchoGroup::~EchoGroup(void) noexcept
 {
 }
 
-std::uint32_t EchoGroup::get_session_count(void) const noexcept
+std::size_t EchoGroup::get_account_miss_count(void) const noexcept
 {
-	return this->session_count.load(std::memory_order_relaxed);
+	return this->account_miss_count.load(std::memory_order_relaxed);
 }
 
 void EchoGroup::on_enter(SessionID id) noexcept
 {
 	std::int64_t account_no;
 
-	this->session_count.fetch_add(1, std::memory_order_relaxed);
-
+	// A miss means AuthGroup's entry went missing between put() and take() --
+	// the session died mid-move and on_client_leave removed it first. The
+	// session cannot be served without its account, so it is dropped, but the
+	// count says how often that race actually fires.
 	if (!this->accounts.take(id, account_no))
 	{
+		this->account_miss_count.fetch_add(1, std::memory_order_relaxed);
 		this->server.disconnect(id);
 		return;
 	}
@@ -50,8 +58,6 @@ void EchoGroup::on_enter(SessionID id) noexcept
 void EchoGroup::on_leave(SessionID id) noexcept
 {
 	(void)id;
-
-	this->session_count.fetch_sub(1, std::memory_order_relaxed);
 }
 
 void EchoGroup::on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
@@ -96,7 +102,7 @@ void EchoGroup::send_res_login(SessionID id, std::int64_t account_no) noexcept
 	*packet << LoginStatus::OK;
 	*packet << account_no;
 
-	this->server.send_packet(id, packet);
+	this->senders.post(id, std::move(packet));
 }
 
 void EchoGroup::send_res_echo(SessionID id, std::int64_t account_no, std::int64_t send_time) noexcept
@@ -111,5 +117,6 @@ void EchoGroup::send_res_echo(SessionID id, std::int64_t account_no, std::int64_
 	*packet << account_no;
 	*packet << send_time;
 
-	this->server.send_packet(id, packet);
+	this->senders.post(id, std::move(packet));
 }
+

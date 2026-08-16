@@ -623,6 +623,17 @@ clean_wsa:
 					ajy::log_winapi_error("setsockopt(SO_LINGER)", ::WSAGetLastError(), server->logger, utility::Logger::LogLevel::Warning);
 			}
 
+			{
+				tcp_keepalive keepalive_option;
+				DWORD returned;
+
+				keepalive_option.onoff = 1;
+				keepalive_option.keepalivetime = KEEPALIVE_IDLE_MS;
+				keepalive_option.keepaliveinterval = KEEPALIVE_INTERVAL_MS;
+				if (::WSAIoctl(client_socket, SIO_KEEPALIVE_VALS, &keepalive_option, sizeof(keepalive_option), nullptr, 0, &returned, nullptr, nullptr) == SOCKET_ERROR)
+					ajy::log_winapi_error("WSAIoctl(SIO_KEEPALIVE_VALS)", ::WSAGetLastError(), server->logger, utility::Logger::LogLevel::Warning);
+			}
+
 			::inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
 			if (!server->on_connection_request(ip, ::ntohs(addr.sin_port)))
 			{

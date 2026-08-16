@@ -1,8 +1,8 @@
 /**
- * File: echo_with_group_server.cpp
- * Path: ajylib/examples/echo_with_group/echo_with_group_server.cpp
+ * File: echo_with_group_intent_server.cpp
+ * Path: ajylib/examples/echo_with_group_intent/echo_with_group_intent_server.cpp
  * Description:
- *	A variant of echo_with_group whose group threads never issue a send
+ *	A variant of echo_with_group_intent whose group threads never issue a send
  *	syscall.
  * Author: ajy-dev
  * Created: 2026-08-14
@@ -10,7 +10,7 @@
  * Version: 0.1.0
  */
 
-#include "echo_with_group_server.hpp"
+#include "echo_with_group_intent_server.hpp"
 
 #include "echo_server_config.hpp"
 #include "protocol.hpp"
@@ -24,7 +24,7 @@
 #include <exception>
 #include <new>
 
-EchoWithGroupServer::EchoWithGroupServer(std::string_view logger_name) noexcept
+EchoWithGroupIntentServer::EchoWithGroupIntentServer(std::string_view logger_name) noexcept
 	: ajy::network::windows::iocp::NetServer(
 		  logger_name,
 		  EchoServerConfig::PROTOCOL_CODE,
@@ -43,86 +43,86 @@ EchoWithGroupServer::EchoWithGroupServer(std::string_view logger_name) noexcept
 	this->add_group(this->echo);
 }
 
-EchoWithGroupServer::~EchoWithGroupServer(void) noexcept
+EchoWithGroupIntentServer::~EchoWithGroupIntentServer(void) noexcept
 {
 	this->stop();
 }
 
-bool EchoWithGroupServer::start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept
+bool EchoWithGroupIntentServer::start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept
 {
 	this->senders.start();
 
 	return ajy::network::windows::iocp::NetServer::start(bind_ip, port, worker_thread_count, nagle, max_sessions);
 }
 
-void EchoWithGroupServer::stop(void) noexcept
+void EchoWithGroupIntentServer::stop(void) noexcept
 {
 	ajy::network::windows::iocp::NetServer::stop();
 
 	this->senders.stop();
 }
 
-std::uint32_t EchoWithGroupServer::get_auth_frame_tps(void) noexcept
+std::uint32_t EchoWithGroupIntentServer::get_auth_frame_tps(void) noexcept
 {
 	return this->auth.get_frame_tps();
 }
 
-std::uint32_t EchoWithGroupServer::get_echo_frame_tps(void) noexcept
+std::uint32_t EchoWithGroupIntentServer::get_echo_frame_tps(void) noexcept
 {
 	return this->echo.get_frame_tps();
 }
 
-std::uint64_t EchoWithGroupServer::get_auth_session_count(void) const noexcept
+std::uint64_t EchoWithGroupIntentServer::get_auth_session_count(void) const noexcept
 {
 	return this->auth.get_session_count();
 }
 
-std::uint64_t EchoWithGroupServer::get_auth_enter_count(void) const noexcept
+std::uint64_t EchoWithGroupIntentServer::get_auth_enter_count(void) const noexcept
 {
 	return this->auth.get_enter_count();
 }
 
-std::uint64_t EchoWithGroupServer::get_auth_leave_count(void) const noexcept
+std::uint64_t EchoWithGroupIntentServer::get_auth_leave_count(void) const noexcept
 {
 	return this->auth.get_leave_count();
 }
 
-std::uint64_t EchoWithGroupServer::get_echo_session_count(void) const noexcept
+std::uint64_t EchoWithGroupIntentServer::get_echo_session_count(void) const noexcept
 {
 	return this->echo.get_session_count();
 }
 
-std::uint64_t EchoWithGroupServer::get_echo_enter_count(void) const noexcept
+std::uint64_t EchoWithGroupIntentServer::get_echo_enter_count(void) const noexcept
 {
 	return this->echo.get_enter_count();
 }
 
-std::uint64_t EchoWithGroupServer::get_echo_leave_count(void) const noexcept
+std::uint64_t EchoWithGroupIntentServer::get_echo_leave_count(void) const noexcept
 {
 	return this->echo.get_leave_count();
 }
 
-std::size_t EchoWithGroupServer::get_echo_job_pool_in_use(void) const noexcept
+std::size_t EchoWithGroupIntentServer::get_echo_job_pool_in_use(void) const noexcept
 {
 	return this->echo.get_queued_job_count();
 }
 
-std::size_t EchoWithGroupServer::get_echo_rejected_session_count(void) const noexcept
+std::size_t EchoWithGroupIntentServer::get_echo_rejected_session_count(void) const noexcept
 {
 	return this->echo.get_rejected_session_count();
 }
 
-std::size_t EchoWithGroupServer::get_send_worker_count(void) const noexcept
+std::size_t EchoWithGroupIntentServer::get_send_worker_count(void) const noexcept
 {
 	return this->senders.get_worker_count();
 }
 
-bool EchoWithGroupServer::is_send_queue_empty(std::size_t worker) const noexcept
+bool EchoWithGroupIntentServer::is_send_queue_empty(std::size_t worker) const noexcept
 {
 	return this->senders.is_queue_empty(worker);
 }
 
-bool EchoWithGroupServer::on_connection_request(const char *ip, std::uint16_t port)
+bool EchoWithGroupIntentServer::on_connection_request(const char *ip, std::uint16_t port)
 {
 	(void)ip;
 	(void)port;
@@ -130,17 +130,17 @@ bool EchoWithGroupServer::on_connection_request(const char *ip, std::uint16_t po
 	return true;
 }
 
-void EchoWithGroupServer::on_client_join(SessionID id) noexcept
+void EchoWithGroupIntentServer::on_client_join(SessionID id) noexcept
 {
 	this->auth.post_enter(id);
 }
 
-void EchoWithGroupServer::on_client_leave(SessionID id) noexcept
+void EchoWithGroupIntentServer::on_client_leave(SessionID id) noexcept
 {
 	this->accounts.remove(id);
 }
 
-void EchoWithGroupServer::on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
+void EchoWithGroupIntentServer::on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
 {
 	// A session belongs to no group between on_client_join and the auth group's
 	// on_enter, and again between on_leave and the destination's on_enter. A
@@ -166,32 +166,32 @@ void EchoWithGroupServer::on_recv(SessionID id, std::unique_ptr<Packet> packet) 
 		static_cast<unsigned long long>(id));
 }
 
-std::size_t EchoWithGroupServer::get_orphan_recv_count(void) const noexcept
+std::size_t EchoWithGroupIntentServer::get_orphan_recv_count(void) const noexcept
 {
 	return this->orphan_recv_count.load(std::memory_order_relaxed);
 }
 
-std::size_t EchoWithGroupServer::get_orphan_join_count(void) const noexcept
+std::size_t EchoWithGroupIntentServer::get_orphan_join_count(void) const noexcept
 {
 	return this->orphan_join_count.load(std::memory_order_relaxed);
 }
 
-std::size_t EchoWithGroupServer::get_account_store_size(void) noexcept
+std::size_t EchoWithGroupIntentServer::get_account_store_size(void) noexcept
 {
 	return this->accounts.get_size();
 }
 
-std::size_t EchoWithGroupServer::get_echo_account_miss_count(void) const noexcept
+std::size_t EchoWithGroupIntentServer::get_echo_account_miss_count(void) const noexcept
 {
 	return this->echo.get_account_miss_count();
 }
 
-std::size_t EchoWithGroupServer::get_echo_stale_enter_count(void) const noexcept
+std::size_t EchoWithGroupIntentServer::get_echo_stale_enter_count(void) const noexcept
 {
 	return this->echo.get_stale_enter_count();
 }
 
-void EchoWithGroupServer::on_send(SessionID id, std::size_t size) noexcept
+void EchoWithGroupIntentServer::on_send(SessionID id, std::size_t size) noexcept
 {
 	(void)id;
 
@@ -199,7 +199,7 @@ void EchoWithGroupServer::on_send(SessionID id, std::size_t size) noexcept
 	this->send_completion_bytes.fetch_add(size, std::memory_order_relaxed);
 }
 
-void EchoWithGroupServer::query_send_batching(std::uint32_t &completions_per_second, std::size_t &mean_size) noexcept
+void EchoWithGroupIntentServer::query_send_batching(std::uint32_t &completions_per_second, std::size_t &mean_size) noexcept
 {
 	ServerClock::time_point now;
 	ServerClock::time_point previous;
@@ -219,10 +219,10 @@ void EchoWithGroupServer::query_send_batching(std::uint32_t &completions_per_sec
 	mean_size = count ? static_cast<std::size_t>(bytes / count) : 0;
 }
 
-void EchoWithGroupServer::on_worker_thread_begin(void) noexcept
+void EchoWithGroupIntentServer::on_worker_thread_begin(void) noexcept
 {
 }
 
-void EchoWithGroupServer::on_worker_thread_end(void) noexcept
+void EchoWithGroupIntentServer::on_worker_thread_end(void) noexcept
 {
 }

@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -40,7 +41,7 @@ namespace ajy::concurrency
 		using Packet = typename TServer::Packet;
 		using ServerClock = typename TServer::ServerClock;
 
-		explicit Group(TServer &server, std::uint32_t fps) noexcept;
+		Group(TServer &server, std::uint32_t fps, std::string_view logger_name) noexcept;
 		virtual ~Group(void) noexcept;
 
 		Group(const Group &other) = delete;
@@ -69,17 +70,13 @@ namespace ajy::concurrency
 		void move_session(SessionID id, Group &destination) noexcept;
 
 		TServer &server;
+		utility::Logger *logger;
 
 	private:
 		friend TServer;
 
-		// TEMPORARY: hardcoded so the group can log without a signature change.
-		// Whichever example is under test creates a Logger under this name.
-		static constexpr const char *LOGGER_NAME = "echo_sendintent";
-
 		static constexpr std::size_t JOB_QUEUE_CAPACITY = 1048576;
 		static constexpr std::size_t REJECT_LOG_INTERVAL = 65535;
-		static constexpr std::size_t QUEUE_WARNING_THRESHOLD = 65535;
 
 		enum class JobType
 		{
@@ -113,7 +110,6 @@ namespace ajy::concurrency
 		void stop(void) noexcept;
 
 		void reject_session(const char *function_name, SessionID id) noexcept;
-		void report_backlog(const char *function_name, std::size_t size) noexcept;
 
 		void drain_jobs(void) noexcept;
 		void wake_thread(void) noexcept;
@@ -129,7 +125,6 @@ namespace ajy::concurrency
 		std::atomic<std::size_t> rejected_session_count;
 		std::atomic<std::size_t> stale_enter_count;
 		std::atomic<bool> reject_reported;
-		std::atomic<bool> backlog_reported;
 
 		static constexpr std::uint32_t EMPTY_GENERATION = ~static_cast<std::uint32_t>(0);
 

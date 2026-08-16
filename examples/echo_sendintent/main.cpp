@@ -30,6 +30,11 @@
 #include <memory>
 #include <sstream>
 
+// Timer resolution, declared here so the library headers stay untouched.
+extern "C" __declspec(dllimport) unsigned int __stdcall timeBeginPeriod(unsigned int period);
+extern "C" __declspec(dllimport) unsigned int __stdcall timeEndPeriod(unsigned int period);
+#pragma comment(lib, "winmm.lib")
+
 namespace
 {
 	constexpr ajy::utility::Logger::LogLevel LOG_LEVEL = ajy::utility::Logger::LogLevel::Warning;
@@ -49,6 +54,10 @@ int main(void)
 
 	logger = ajy::utility::Logger::get(logger_index);
 	logger->set_threshold(LOG_LEVEL);
+
+	// 1 ms timer resolution: the group frame loop waits on a condition
+	// variable with a 33 ms timeout, which the 15.6 ms default quantizes.
+	::timeBeginPeriod(1);
 
 	ajy::utility::monitor::Monitor monitor;
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::ProcessCpuProbe>("process_cpu"));
@@ -254,6 +263,8 @@ int main(void)
 	console.run();
 
 	reporter.stop();
+
+	::timeEndPeriod(1);
 
 	return EXIT_SUCCESS;
 }

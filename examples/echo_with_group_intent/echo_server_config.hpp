@@ -1,16 +1,16 @@
 /**
  * File: echo_server_config.hpp
- * Path: ajylib/examples/echo_with_group/echo_server_config.hpp
+ * Path: ajylib/examples/echo_with_group_intent/echo_server_config.hpp
  * Description:
- *	Configuration constants for the echo_with_group example
+ *	Configuration constants for the echo_with_group_intent example
  * Author: ajy-dev
  * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
 
-#ifndef ECHO_WITH_GROUP_SERVER_CONFIG_HPP
-#define ECHO_WITH_GROUP_SERVER_CONFIG_HPP
+#ifndef ECHO_WITH_GROUP_INTENT_SERVER_CONFIG_HPP
+#define ECHO_WITH_GROUP_INTENT_SERVER_CONFIG_HPP
 
 #include <cstddef>
 #include <cstdint>

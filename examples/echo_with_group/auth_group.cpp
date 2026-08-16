@@ -4,7 +4,7 @@
  * Description:
  *	The authentication group of the echo_with_group example.
  * Author: ajy-dev
- * Created: 2026-08-10
+ * Created: 2026-08-14
  * Updated: Never
  * Version: 0.1.0
  */
@@ -18,13 +18,12 @@
 
 AuthGroup::AuthGroup(
 	ajy::network::windows::iocp::NetServer &server,
-	std::vector<std::unique_ptr<EchoGroup>> &echoes,
+	EchoGroup &echo,
 	AccountStore &accounts,
 	std::uint32_t fps) noexcept
-	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps)
-	, echoes(echoes)
+	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps, "echo_with_group")
+	, echo(echo)
 	, accounts(accounts)
-	, session_count(0)
 {
 }
 
@@ -32,23 +31,14 @@ AuthGroup::~AuthGroup(void) noexcept
 {
 }
 
-std::uint32_t AuthGroup::get_session_count(void) const noexcept
-{
-	return this->session_count.load(std::memory_order_relaxed);
-}
-
 void AuthGroup::on_enter(SessionID id) noexcept
 {
 	(void)id;
-
-	this->session_count.fetch_add(1, std::memory_order_relaxed);
 }
 
 void AuthGroup::on_leave(SessionID id) noexcept
 {
 	(void)id;
-
-	this->session_count.fetch_sub(1, std::memory_order_relaxed);
 }
 
 void AuthGroup::on_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
@@ -79,12 +69,10 @@ void AuthGroup::on_frame(typename ServerClock::duration elapsed) noexcept
 void AuthGroup::handle_req_login(SessionID id, Packet *packet) noexcept
 {
 	std::int64_t account_no;
-	std::size_t shard;
 
 	*packet >> account_no;
 
 	this->accounts.put(id, account_no);
 
-	shard = static_cast<std::size_t>(id) % this->echoes.size();
-	this->move_session(id, *this->echoes[shard]);
+	this->move_session(id, this->echo);
 }

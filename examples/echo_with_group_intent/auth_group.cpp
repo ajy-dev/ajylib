@@ -1,11 +1,11 @@
 /**
  * File: auth_group.cpp
- * Path: ajylib/examples/echo_sendintent/auth_group.cpp
+ * Path: ajylib/examples/echo_with_group_intent/auth_group.cpp
  * Description:
- *	The authentication group of the echo_sendintent example.
+ *	The authentication group of the echo_with_group_intent example.
  * Author: ajy-dev
- * Created: 2026-08-10
- * Updated: 2026-08-14
+ * Created: 2026-08-14
+ * Updated: Never
  * Version: 0.1.0
  */
 
@@ -18,11 +18,11 @@
 
 AuthGroup::AuthGroup(
 	ajy::network::windows::iocp::NetServer &server,
-	std::vector<std::unique_ptr<EchoGroup>> &echoes,
+	EchoGroup &echo,
 	AccountStore &accounts,
 	std::uint32_t fps) noexcept
-	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps, "echo_sendintent")
-	, echoes(echoes)
+	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps, "echo_with_group_intent")
+	, echo(echo)
 	, accounts(accounts)
 {
 }
@@ -69,12 +69,10 @@ void AuthGroup::on_frame(typename ServerClock::duration elapsed) noexcept
 void AuthGroup::handle_req_login(SessionID id, Packet *packet) noexcept
 {
 	std::int64_t account_no;
-	std::size_t shard;
 
 	*packet >> account_no;
 
 	this->accounts.put(id, account_no);
 
-	shard = static_cast<std::size_t>(id) % this->echoes.size();
-	this->move_session(id, *this->echoes[shard]);
+	this->move_session(id, this->echo);
 }

@@ -1,8 +1,8 @@
 /**
  * File: auth_group.hpp
- * Path: ajylib/examples/echo_with_group/auth_group.hpp
+ * Path: ajylib/examples/echo_with_group_intent/auth_group.hpp
  * Description:
- *	The authentication group of the echo_with_group example. Every session
+ *	The authentication group of the echo_with_group_intent example. Every session
  *	enters here on connect and is moved to the echo group once it presents a
  *	login request.
  * Note:

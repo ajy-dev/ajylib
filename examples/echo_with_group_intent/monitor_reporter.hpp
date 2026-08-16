@@ -1,6 +1,6 @@
 /**
  * File: monitor_reporter.hpp
- * Path: ajylib/examples/echo_with_group/monitor_reporter.hpp
+ * Path: ajylib/examples/echo_with_group_intent/monitor_reporter.hpp
  * Description:
  *	Drives a Monitor on a 1-second thread and, on the same cadence, reports
  *	the game server's metrics (DataType 10-23) to the monitoring server as an
@@ -15,8 +15,8 @@
  * Version: 0.1.0
  */
 
-#ifndef ECHO_WITH_GROUP_MONITOR_REPORTER_HPP
-#define ECHO_WITH_GROUP_MONITOR_REPORTER_HPP
+#ifndef ECHO_WITH_GROUP_INTENT_MONITOR_REPORTER_HPP
+#define ECHO_WITH_GROUP_INTENT_MONITOR_REPORTER_HPP
 
 #include <ajy/network/protocol/net_packet_buffer.hpp>
 #include <ajy/utility/logger.hpp>
@@ -29,12 +29,12 @@
 #include <string_view>
 #include <thread>
 
-class EchoWithGroupServer;
+class EchoWithGroupIntentServer;
 
 class MonitorReporter
 {
 public:
-	MonitorReporter(ajy::utility::monitor::Monitor &monitor, EchoWithGroupServer &server, std::string_view logger_name) noexcept;
+	MonitorReporter(ajy::utility::monitor::Monitor &monitor, EchoWithGroupIntentServer &server, std::string_view logger_name) noexcept;
 	~MonitorReporter(void) noexcept;
 
 	MonitorReporter(const MonitorReporter &other) = delete;
@@ -60,7 +60,7 @@ private:
 	std::int32_t probe_value(std::string_view name) noexcept;
 
 	ajy::utility::monitor::Monitor &monitor;
-	EchoWithGroupServer &server;
+	EchoWithGroupIntentServer &server;
 	ajy::utility::Logger *logger;
 
 	std::atomic<bool> running;

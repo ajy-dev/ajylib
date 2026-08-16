@@ -24,6 +24,7 @@
 #include <Winsock2.h>
 #include <Windows.h>
 #include <WS2tcpip.h>
+#include <mstcpip.h>
 #include <iphlpapi.h>
 #include <Psapi.h>
 // clang-format on

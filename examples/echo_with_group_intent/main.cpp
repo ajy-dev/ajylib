@@ -1,8 +1,8 @@
 /**
  * File: main.cpp
- * Path: ajylib/examples/echo_sendworker/main.cpp
+ * Path: ajylib/examples/echo_with_group_intent/main.cpp
  * Description:
- *	Entry point for the echo_sendworker example. Drives the server through
+ *	Entry point for the echo_with_group_intent example. Drives the server through
  *	an interactive management console; type 'help' for available commands,
  *	'exit' to quit.
  * Note:
@@ -13,7 +13,7 @@
  * Version: 0.1.0
  */
 
-#include "echo_sendworker_server.hpp"
+#include "echo_with_group_intent_server.hpp"
 #include "monitor_reporter.hpp"
 
 #include <ajy/network/server_console_commands.hpp>
@@ -45,7 +45,7 @@ int main(void)
 	std::size_t logger_index;
 	ajy::utility::Logger *logger;
 
-	logger_index = ajy::utility::Logger::create("echo_sendworker");
+	logger_index = ajy::utility::Logger::create("echo_with_group_intent");
 	if (logger_index >= ajy::utility::Logger::INVALID_INDEX)
 	{
 		std::fprintf(stderr, "Logger::create() failed.\n");
@@ -66,9 +66,9 @@ int main(void)
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemAvailableMemoryProbe>("system_available_mem_mb"));
 	monitor.add(std::make_unique<ajy::utility::monitor::windows::SystemNonpagedMemoryProbe>("system_nonpaged_mem_mb"));
 
-	EchoSendWorkerServer server("echo_sendworker");
+	EchoWithGroupIntentServer server("echo_with_group_intent");
 	ajy::utility::Console console;
-	MonitorReporter reporter(monitor);
+	MonitorReporter reporter(monitor, server, "monitor_reporter");
 
 	ajy::network::register_server_commands(&console, &server);
 	ajy::utility::monitor::register_monitor_commands(&console, &monitor);
@@ -79,14 +79,9 @@ int main(void)
 		"Shows each group's frame rate (frames/sec) since the last call.",
 		[&server](std::istringstream &args)
 		{
-			std::size_t i;
-
 			(void)args;
 
-			std::printf("Auth FPS: %u", server.get_auth_frame_tps());
-			for (i = 0; i < server.get_echo_group_count(); ++i)
-				std::printf(" / Echo[%zu] FPS: %u", i, server.get_echo_frame_tps(i));
-			std::printf("\n");
+			std::printf("Auth FPS: %u / Echo FPS: %u\n", server.get_auth_frame_tps(), server.get_echo_frame_tps());
 		});
 
 	console.register_command(
@@ -116,19 +111,17 @@ int main(void)
 				static_cast<unsigned long long>(total_enter),
 				static_cast<unsigned long long>(total_leave));
 
-			for (std::size_t i = 0; i < server.get_echo_group_count(); ++i)
 			{
 				std::uint64_t live;
 				std::uint64_t enter;
 				std::uint64_t leave;
 
-				live = server.get_echo_session_count(i);
-				enter = server.get_echo_enter_count(i);
-				leave = server.get_echo_leave_count(i);
+				live = server.get_echo_session_count();
+				enter = server.get_echo_enter_count();
+				leave = server.get_echo_leave_count();
 
 				std::printf(
-					"Echo[%zu]: live %llu, enter %llu, leave %llu\n",
-					i,
+					"Echo:    live %llu, enter %llu, leave %llu\n",
 					static_cast<unsigned long long>(live),
 					static_cast<unsigned long long>(enter),
 					static_cast<unsigned long long>(leave));
@@ -159,10 +152,8 @@ int main(void)
 
 			(void)args;
 
-			for (i = 0; i < server.get_echo_group_count(); ++i)
-				std::printf("Echo[%zu]: %zu (rejected %zu) ", i,
-					server.get_echo_job_pool_in_use(i), server.get_echo_rejected_session_count(i));
-			std::printf("\n");
+			std::printf("Echo: %zu (rejected %zu)\n",
+				server.get_echo_job_pool_in_use(), server.get_echo_rejected_session_count());
 
 			for (i = 0; i < server.get_send_worker_count(); ++i)
 				std::printf("Send[%zu]: %s ", i, server.is_send_queue_empty(i) ? "empty" : "BUSY");
@@ -190,18 +181,15 @@ int main(void)
 		"Shows where sessions or packets went missing.",
 		[&server](std::istringstream &args)
 		{
-			std::size_t i;
-
 			(void)args;
 
 			std::printf("orphan_recv: %zu, account_store: %zu\n",
 				server.get_orphan_recv_count(), server.get_account_store_size());
 
-			for (i = 0; i < server.get_echo_group_count(); ++i)
-				std::printf("Echo[%zu]: account_miss %zu, stale_enter %zu, rejected %zu\n", i,
-					server.get_echo_account_miss_count(i),
-					server.get_echo_stale_enter_count(i),
-					server.get_echo_rejected_session_count(i));
+			std::printf("Echo: account_miss %zu, stale_enter %zu, rejected %zu\n",
+				server.get_echo_account_miss_count(),
+				server.get_echo_stale_enter_count(),
+				server.get_echo_rejected_session_count());
 		});
 
 	console.register_command(
@@ -216,7 +204,7 @@ int main(void)
 
 	reporter.start();
 
-	std::printf("EchoSendWorkerServer management console. Type 'help' for commands, 'exit' to quit.\n");
+	std::printf("EchoWithGroupIntentServer management console. Type 'help' for commands, 'exit' to quit.\n");
 	console.run();
 
 	reporter.stop();

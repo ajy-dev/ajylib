@@ -1,6 +1,6 @@
 /**
  * File: account_store.hpp
- * Path: ajylib/examples/echo_with_group/account_store.hpp
+ * Path: ajylib/examples/echo_with_group_intent/account_store.hpp
  * Description:
  *	A session-to-account map shared across groups.
  * Note:

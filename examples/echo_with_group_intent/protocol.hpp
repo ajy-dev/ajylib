@@ -1,8 +1,8 @@
 /**
  * File: protocol.hpp
- * Path: ajylib/examples/echo_with_group/protocol.hpp
+ * Path: ajylib/examples/echo_with_group_intent/protocol.hpp
  * Description:
- *	Shared packet types for the echo_with_group example
+ *	Shared packet types for the echo_with_group_intent example
  * Note:
  *	All integers little-endian, packed. The wire format follows an external
  *	dummy client, so each field's original type is noted in a trailing
@@ -13,8 +13,8 @@
  * Version: 0.1.0
  */
 
-#ifndef ECHO_WITH_GROUP_PROTOCOL_HPP
-#define ECHO_WITH_GROUP_PROTOCOL_HPP
+#ifndef ECHO_WITH_GROUP_INTENT_PROTOCOL_HPP
+#define ECHO_WITH_GROUP_INTENT_PROTOCOL_HPP
 
 #include <cstdint>
 

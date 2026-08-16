@@ -21,7 +21,7 @@ AuthGroup::AuthGroup(
 	std::vector<std::unique_ptr<EchoGroup>> &echoes,
 	AccountStore &accounts,
 	std::uint32_t fps) noexcept
-	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps)
+	: ajy::concurrency::Group<ajy::network::windows::iocp::NetServer>(server, fps, "echo_sendworker")
 	, echoes(echoes)
 	, accounts(accounts)
 {

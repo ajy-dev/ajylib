@@ -1,6 +1,6 @@
 /**
  * File: monitor_reporter.cpp
- * Path: ajylib/examples/echo_with_group/monitor_reporter.cpp
+ * Path: ajylib/examples/echo_with_group_intent/monitor_reporter.cpp
  * Description:
  *	Drives a Monitor on a 1-second thread and reports the game server's
  *	metrics (DataType 10-23) to the monitoring server as an SS reporter.
@@ -17,7 +17,7 @@
 
 #include "monitor_reporter.hpp"
 
-#include "echo_with_group_server.hpp"
+#include "echo_with_group_intent_server.hpp"
 #include "monitor_report_config.hpp"
 
 #include <ajy/network/protocol/net_packet_buffer.hpp>
@@ -43,7 +43,7 @@ namespace
 	constexpr std::size_t DATA_UPDATE_PAYLOAD_SIZE = sizeof(std::uint16_t) + sizeof(std::uint8_t) + sizeof(std::int32_t) + sizeof(std::int32_t);
 }
 
-MonitorReporter::MonitorReporter(ajy::utility::monitor::Monitor &monitor, EchoWithGroupServer &server, std::string_view logger_name) noexcept
+MonitorReporter::MonitorReporter(ajy::utility::monitor::Monitor &monitor, EchoWithGroupIntentServer &server, std::string_view logger_name) noexcept
 	: monitor(monitor)
 	, server(server)
 	, logger(ajy::utility::Logger::get(logger_name))

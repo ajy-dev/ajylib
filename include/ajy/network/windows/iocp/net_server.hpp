@@ -115,6 +115,12 @@ namespace ajy::network::windows::iocp
 		static constexpr std::size_t SEND_BATCH_SIZE = 128;
 		static constexpr std::size_t PACKET_POOL_INITIAL_CAPACITY = 1024;
 
+		// TEMPORARY: fixed 2-minute keepalive for the long-run test.
+		// idle + interval * 10 retries (the retry count is fixed by Windows
+		// when SIO_KEEPALIVE_VALS is used). Promote to a start() option later.
+		static constexpr DWORD KEEPALIVE_IDLE_MS = 60'000;
+		static constexpr DWORD KEEPALIVE_INTERVAL_MS = 6'000;
+
 		struct Session
 		{
 			std::uint32_t index;

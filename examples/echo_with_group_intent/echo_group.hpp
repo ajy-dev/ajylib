@@ -1,8 +1,8 @@
 /**
  * File: echo_group.hpp
- * Path: ajylib/examples/echo_with_group/echo_group.hpp
+ * Path: ajylib/examples/echo_with_group_intent/echo_group.hpp
  * Description:
- *	The content group of the echo_with_group example. It builds the reply
+ *	The content group of the echo_with_group_intent example. It builds the reply
  *	packet itself and hands it to a SendWorkerPool, so only the send call
  *	leaves the group thread.
  * Author: ajy-dev
@@ -49,8 +49,6 @@ protected:
 	void on_frame(typename ServerClock::duration elapsed) noexcept override;
 
 private:
-	void send_res_login(SessionID id, std::int64_t account_no) noexcept;
-	void send_res_echo(SessionID id, std::int64_t account_no, std::int64_t send_time) noexcept;
 
 	AccountStore &accounts;
 	SendWorkerPool &senders;

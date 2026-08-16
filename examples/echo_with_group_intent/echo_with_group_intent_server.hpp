@@ -1,11 +1,11 @@
 /**
- * File: echo_with_group_server.hpp
- * Path: ajylib/examples/echo_with_group/echo_with_group_server.hpp
+ * File: echo_with_group_intent_server.hpp
+ * Path: ajylib/examples/echo_with_group_intent/echo_with_group_intent_server.hpp
  * Description:
- *	A variant of echo_with_group whose group threads never issue a send
+ *	A variant of echo_with_group_intent whose group threads never issue a send
  *	syscall: finished packets are handed to a SendWorkerPool instead.
  * Note:
- *	Measurement scaffolding. Run it against echo_with_group under the same
+ *	Measurement scaffolding. Run it against echo_with_group_intent under the same
  *	dummy settings to size how much of a group thread's per-packet cost is
  *	the send path.
  * Author: ajy-dev
@@ -14,8 +14,8 @@
  * Version: 0.1.0
  */
 
-#ifndef ECHO_WITH_GROUP_SERVER_HPP
-#define ECHO_WITH_GROUP_SERVER_HPP
+#ifndef ECHO_WITH_GROUP_INTENT_SERVER_HPP
+#define ECHO_WITH_GROUP_INTENT_SERVER_HPP
 
 #include "account_store.hpp"
 #include "auth_group.hpp"
@@ -30,16 +30,16 @@
 #include <cstdint>
 #include <string_view>
 
-class EchoWithGroupServer : public ajy::network::windows::iocp::NetServer
+class EchoWithGroupIntentServer : public ajy::network::windows::iocp::NetServer
 {
 public:
-	explicit EchoWithGroupServer(std::string_view logger_name) noexcept;
-	~EchoWithGroupServer(void) noexcept override;
+	explicit EchoWithGroupIntentServer(std::string_view logger_name) noexcept;
+	~EchoWithGroupIntentServer(void) noexcept override;
 
-	EchoWithGroupServer(const EchoWithGroupServer &other) = delete;
-	EchoWithGroupServer &operator=(const EchoWithGroupServer &other) = delete;
-	EchoWithGroupServer(EchoWithGroupServer &&other) = delete;
-	EchoWithGroupServer &operator=(EchoWithGroupServer &&other) = delete;
+	EchoWithGroupIntentServer(const EchoWithGroupIntentServer &other) = delete;
+	EchoWithGroupIntentServer &operator=(const EchoWithGroupIntentServer &other) = delete;
+	EchoWithGroupIntentServer(EchoWithGroupIntentServer &&other) = delete;
+	EchoWithGroupIntentServer &operator=(EchoWithGroupIntentServer &&other) = delete;
 
 	bool start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept override;
 	void stop(void) noexcept override;

@@ -32,8 +32,9 @@
 namespace ajy::concurrency
 {
 	template <typename TServer>
-	Group<TServer>::Group(TServer &server, std::uint32_t fps) noexcept
+	Group<TServer>::Group(TServer &server, std::uint32_t fps, std::string_view logger_name) noexcept
 		: server(server)
+		, logger(utility::Logger::get(logger_name))
 		, frame_interval(calculate_frame_interval(fps))
 		, frame_count(0)
 		, last_frame_tps(0)
@@ -42,7 +43,6 @@ namespace ajy::concurrency
 		, rejected_session_count(0)
 		, stale_enter_count(0)
 		, reject_reported(false)
-		, backlog_reported(false)
 		, session_count(0)
 		, enter_count(0)
 		, leave_count(0)
@@ -59,8 +59,6 @@ namespace ajy::concurrency
 	template <typename TServer>
 	void Group<TServer>::post_enter(SessionID id) noexcept
 	{
-		std::size_t size;
-
 		if (!this->jobs.enqueue(Job(JobType::Enter, id)))
 		{
 			this->reject_session("post_enter", id);
@@ -69,27 +67,17 @@ namespace ajy::concurrency
 
 		this->server.set_session_group(id, this);
 
-		size = this->jobs.get_size();
-		if (size > QUEUE_WARNING_THRESHOLD)
-			this->report_backlog("post_enter", size);
-
 		this->wake_thread();
 	}
 
 	template <typename TServer>
 	void Group<TServer>::post_leave(SessionID id) noexcept
 	{
-		std::size_t size;
-
 		if (!this->jobs.enqueue(Job(JobType::Leave, id)))
 		{
 			this->reject_session("post_leave", id);
 			return;
 		}
-
-		size = this->jobs.get_size();
-		if (size > QUEUE_WARNING_THRESHOLD)
-			this->report_backlog("post_leave", size);
 
 		this->wake_thread();
 	}
@@ -97,17 +85,11 @@ namespace ajy::concurrency
 	template <typename TServer>
 	void Group<TServer>::post_recv(SessionID id, std::unique_ptr<Packet> packet) noexcept
 	{
-		std::size_t size;
-
 		if (!this->jobs.enqueue(Job(JobType::Recv, id, std::move(packet))))
 		{
 			this->reject_session("post_recv", id);
 			return;
 		}
-
-		size = this->jobs.get_size();
-		if (size > QUEUE_WARNING_THRESHOLD)
-			this->report_backlog("post_recv", size);
 
 		this->wake_thread();
 	}
@@ -406,13 +388,11 @@ namespace ajy::concurrency
 		}
 
 		this->reject_reported.store(false, std::memory_order_relaxed);
-		this->backlog_reported.store(false, std::memory_order_relaxed);
 	}
 
 	template <typename TServer>
 	void Group<TServer>::reject_session(const char *function_name, SessionID id) noexcept
 	{
-		utility::Logger *logger;
 		std::size_t previous;
 
 		this->server.disconnect(id);
@@ -425,37 +405,16 @@ namespace ajy::concurrency
 		if (this->reject_reported.exchange(true, std::memory_order_relaxed))
 			return;
 
-		logger = utility::Logger::get(LOGGER_NAME);
-		if (!logger)
+		if (!this->logger)
 			return;
 
-		logger->log(
+		this->logger->log(
 			utility::Logger::LogLevel::Error,
 			"%s(): job queue full, disconnecting. rejected: %zu, capacity: %zu, id: %llu",
 			function_name,
 			previous + 1,
 			this->jobs.get_capacity(),
 			static_cast<unsigned long long>(id));
-	}
-
-	template <typename TServer>
-	void Group<TServer>::report_backlog(const char *function_name, std::size_t size) noexcept
-	{
-		utility::Logger *logger;
-
-		if (this->backlog_reported.exchange(true, std::memory_order_relaxed))
-			return;
-
-		logger = utility::Logger::get(LOGGER_NAME);
-		if (!logger)
-			return;
-
-		logger->log(
-			utility::Logger::LogLevel::Warning,
-			"%s(): job queue backlog over threshold. size: %zu, capacity: %zu",
-			function_name,
-			size,
-			this->jobs.get_capacity());
 	}
 
 	template <typename TServer>
