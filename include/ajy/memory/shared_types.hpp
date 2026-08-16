@@ -2,10 +2,10 @@
  * File: shared_types.hpp
  * Path: ajylib/include/ajy/memory/shared_types.hpp
  * Description:
- * 	Shared types for ajy::memory allocators.
+ *	Shared types for ajy::memory allocators.
  * Author: ajy-dev
  * Created: 2026-06-16
- * Updated: Never
+ * Updated: 2026-08-16
  * Version: 0.1.0
  */
 
@@ -29,6 +29,21 @@ namespace ajy::memory
 	};
 
 	template <typename T>
+	struct ObjectSlot
+	{
+		ObjectSlot(void) noexcept;
+		~ObjectSlot(void) noexcept = default;
+
+		ObjectSlot(const ObjectSlot &other) = delete;
+		ObjectSlot &operator=(const ObjectSlot &other) = delete;
+		ObjectSlot(ObjectSlot &&other) = delete;
+		ObjectSlot &operator=(ObjectSlot &&other) = delete;
+
+		void *pool_next;
+		alignas(T) std::byte storage[sizeof(T)];
+	};
+
+	template <typename T>
 	struct Chunk
 	{
 		Slot<T> *slots;
@@ -36,5 +51,7 @@ namespace ajy::memory
 		Chunk *next;
 	};
 }
+
+#include <ajy/memory/shared_types.tpp>
 
 #endif

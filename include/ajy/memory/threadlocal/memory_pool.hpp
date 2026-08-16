@@ -12,7 +12,7 @@
  * 	Requires a 64-bit platform with 48-bit canonical addresses.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: 2026-07-20
+ * Updated: 2026-08-16
  * Version: 0.1.0
  */
 
@@ -66,8 +66,8 @@ namespace ajy::memory::threadlocal
 
 			TLSSlot(const TLSSlot &other) = delete;
 			TLSSlot &operator=(const TLSSlot &other) = delete;
-			TLSSlot(TLSSlot &&other) noexcept = default;
-			TLSSlot &operator=(TLSSlot &&other) noexcept = default;
+			TLSSlot(TLSSlot &&other) noexcept;
+			TLSSlot &operator=(TLSSlot &&other) noexcept = delete;
 
 			FreeNode *head;
 			std::size_t count;

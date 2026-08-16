@@ -12,8 +12,6 @@
 #ifndef AJY_MEMORY_CONCEPTS_HPP
 #define AJY_MEMORY_CONCEPTS_HPP
 
-#include <ajy/memory/pool_linked.hpp>
-
 #include <type_traits>
 
 namespace ajy::memory
@@ -39,16 +37,10 @@ namespace ajy::memory
 		&& !std::is_array<T>::value
 		&& CompleteType<T>;
 
-	// The pool threads its free list through the object itself, so a pooled
-	// type must carry the link.
-	template <typename T>
-	concept PoolLinkedType = std::is_base_of<PoolLinked, T>::value;
-
 	template <typename T>
 	concept ObjectPoolableType =
 		MemoryPoolableType<T>
-		&& ClearableType<T>
-		&& PoolLinkedType<T>;
+		&& ClearableType<T>;
 }
 
 #endif

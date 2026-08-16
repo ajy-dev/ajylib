@@ -5,14 +5,13 @@
  * 	Unit tests for ajy::memory::lockfree::ObjectPool.
  * Author: ajy-dev
  * Created: 2026-07-20
- * Updated: 2026-08-14
+ * Updated: Never
  * Version: 0.1.0
  */
 
 #include <gtest/gtest.h>
 
 #include <ajy/memory/lockfree/object_pool.hpp>
-#include <ajy/memory/pool_linked.hpp>
 
 #include <cstddef>
 
@@ -23,7 +22,7 @@ namespace
 	// Tracks live instance count and per-instance clear() calls, and exposes
 	// clear() as required by ObjectPoolableType. live_count observes that the
 	// pool destroys survivors (never leaks) and does not destroy on release.
-	struct Tracked : public ajy::memory::PoolLinked
+	struct Tracked
 	{
 		static inline int live_count = 0;
 

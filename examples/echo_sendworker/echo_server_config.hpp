@@ -33,7 +33,7 @@ namespace EchoServerConfig
 	// --- Send workers ---
 	// Group threads hand finished packets here instead of calling
 	// send_packet themselves, so no WSASend is issued on a group thread.
-	inline constexpr std::size_t SEND_WORKER_COUNT = 4;
+	inline constexpr std::size_t SEND_WORKER_COUNT = 3;
 
 	// --- Wire payload sizes (protocol.hpp) ---
 	inline constexpr std::size_t REQ_LOGIN_SIZE = 78;
