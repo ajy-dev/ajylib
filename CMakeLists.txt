@@ -78,10 +78,12 @@ target_sources(
 		BASE_DIRS include
 		FILES
 			# header files here
+			include/ajy/container/concepts.hpp
 			include/ajy/container/ring_buffer.hpp
 			include/ajy/container/serialization_buffer.hpp
 			include/ajy/container/lockfree/stack.hpp
 			include/ajy/container/lockfree/queue.hpp
+			include/ajy/container/mpsc/queue.hpp
 			include/ajy/memory/concepts.hpp
 			include/ajy/memory/shared_types.hpp
 			include/ajy/memory/lockfree/memory_pool.hpp
