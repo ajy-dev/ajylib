@@ -2,10 +2,10 @@
  * File: memory_pool_test.cpp
  * Path: ajylib/tests/memory/threadlocal/memory_pool_test.cpp
  * Description:
- * 	Unit tests for ajy::memory::threadlocal::MemoryPool.
+ *	Unit tests for ajy::memory::threadlocal::MemoryPool.
  * Author: ajy-dev
  * Created: 2026-06-17
- * Updated: Never
+ * Updated: 2026-08-16
  * Version: 0.1.0
  */
 
@@ -70,6 +70,12 @@ namespace
 		{
 			throw std::runtime_error("ctor failed");
 		}
+	};
+
+	// Must not be used elsewhere; the TLS vector is per-type and never shrinks.
+	struct Exclusive
+	{
+		int value;
 	};
 }
 
@@ -252,4 +258,33 @@ TEST(ThreadlocalMemoryPoolUnitTest, TwoInstancesNoSlotCrossover)
 
 	pool_a.free(ptr_a2);
 	pool_b.free(pool_b.alloc());
+}
+
+TEST(ThreadlocalMemoryPoolUnitTest, TwoInstancesDoNotAllocateSameNode)
+{
+	static constexpr std::size_t BATCH_SIZE = 2;
+
+	MemoryPool<Exclusive> pool_a(MemoryPool<Exclusive>::DEFAULT_MAX_SIZE, BATCH_SIZE);
+	MemoryPool<Exclusive> pool_b(MemoryPool<Exclusive>::DEFAULT_MAX_SIZE, BATCH_SIZE);
+
+	// pool_a fills its TLS slot, then pool_b grows and relocates the vector.
+	Exclusive *a1 = pool_a.alloc();
+	Exclusive *b1 = pool_b.alloc();
+	Exclusive *a2 = pool_a.alloc();
+	Exclusive *b2 = pool_b.alloc();
+
+	ASSERT_NE(a1, nullptr);
+	ASSERT_NE(b1, nullptr);
+	ASSERT_NE(a2, nullptr);
+	ASSERT_NE(b2, nullptr);
+
+	EXPECT_NE(a1, b1);
+	EXPECT_NE(a1, b2);
+	EXPECT_NE(a2, b1);
+	EXPECT_NE(a2, b2);
+
+	pool_a.free(a1);
+	pool_a.free(a2);
+	pool_b.free(b1);
+	pool_b.free(b2);
 }

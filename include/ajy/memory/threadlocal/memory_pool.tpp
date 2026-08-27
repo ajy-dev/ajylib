@@ -170,6 +170,15 @@ namespace ajy::memory::threadlocal
 	}
 
 	template <MemoryPoolableType T>
+	MemoryPool<T>::TLSSlot::TLSSlot(TLSSlot &&other) noexcept
+		: head(other.head)
+		, count(other.count)
+	{
+		other.head = nullptr;
+		other.count = 0;
+	}
+
+	template <MemoryPoolableType T>
 	std::size_t MemoryPool<T>::IndexAllocator::acquire(void) noexcept
 	{
 		try
