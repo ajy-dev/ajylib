@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server declaration.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-21
+ * Updated: 2026-08-09
  * Version: 0.1.0
  */
 
@@ -22,11 +22,12 @@
 #include <ajy/windows.hpp>
 
 #include <atomic>
-#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -36,6 +37,8 @@ namespace ajy::network::windows::iocp
 	class Server : public ajy::network::Server
 	{
 	public:
+		using Packet = protocol::PacketBuffer;
+
 		explicit Server(std::string_view logger_name, std::size_t max_payload_size = protocol::PacketBuffer::DEFAULT_PAYLOAD_CAPACITY) noexcept;
 		~Server(void) noexcept override;
 
@@ -55,13 +58,10 @@ namespace ajy::network::windows::iocp
 		std::uint32_t get_send_message_tps(void) noexcept override;
 		std::size_t get_packet_pool_in_use(void) const noexcept;
 
-	protected:
-		using ServerClock = std::conditional<
-			std::chrono::high_resolution_clock::is_steady,
-			std::chrono::high_resolution_clock,
-			std::chrono::steady_clock>::type;
-		using Packet = protocol::PacketBuffer;
+		std::shared_ptr<Packet> alloc_packet(std::size_t payload_capacity = Packet::DEFAULT_PAYLOAD_CAPACITY) noexcept;
+		bool send_packet(SessionID id, std::shared_ptr<Packet> packet) noexcept;
 
+	protected:
 		virtual bool on_connection_request(const char *ip, std::uint16_t port) = 0;
 		virtual void on_client_join(SessionID id) noexcept = 0;
 		virtual void on_client_leave(SessionID id) noexcept = 0;
@@ -69,9 +69,6 @@ namespace ajy::network::windows::iocp
 		virtual void on_send(SessionID id, std::size_t size) noexcept = 0;
 		virtual void on_worker_thread_begin(void) noexcept = 0;
 		virtual void on_worker_thread_end(void) noexcept = 0;
-
-		std::shared_ptr<Packet> alloc_packet(std::size_t payload_capacity = Packet::DEFAULT_PAYLOAD_CAPACITY) noexcept;
-		bool send_packet(SessionID id, std::shared_ptr<Packet> packet) noexcept;
 
 		utility::Logger *logger;
 
