@@ -2,25 +2,26 @@
  * File: object_pool.hpp
  * Path: ajylib/include/ajy/memory/lockfree/object_pool.hpp
  * Description:
- * 	A lockfree object pool declaration.
+ *	A lockfree object pool declaration.
  * Note:
- * 	The pooled object is reset via clear() on release, not destroyed,
- * 	so its internal state (e.g. a heap buffer) is retained across reuse.
+ *	The pooled object is reset via clear() on release, not destroyed,
+ *	so its internal state (e.g. a heap buffer) is retained across reuse.
  * Author: ajy-dev
  * Created: 2026-07-20
- * Updated: Never
+ * Updated: 2026-08-16
  * Version: 0.1.0
  */
 
 #ifndef AJY_MEMORY_LOCKFREE_OBJECT_POOL_HPP
 #define AJY_MEMORY_LOCKFREE_OBJECT_POOL_HPP
 
-#include <ajy/container/lockfree/stack.hpp>
 #include <ajy/memory/concepts.hpp>
 #include <ajy/memory/lockfree/memory_pool.hpp>
+#include <ajy/memory/shared_types.hpp>
 
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -47,9 +48,24 @@ namespace ajy::memory::lockfree
 		std::size_t get_in_use_count(void) const noexcept;
 
 	private:
+		static_assert(sizeof(std::uintptr_t) == 8, "Requires 64-bit platform");
+		static_assert(std::is_standard_layout<ObjectSlot<T>>::value, "ObjectSlot must be standard layout");
+
+		static std::uintptr_t pack(ObjectSlot<T> *ptr, std::uint16_t tag) noexcept;
+		static ObjectSlot<T> *unpack_ptr(std::uintptr_t raw) noexcept;
+		static std::uint16_t unpack_tag(std::uintptr_t raw) noexcept;
+
+		T *construct(void) noexcept(std::is_nothrow_constructible<T, Args...>::value);
+
+		static T *to_object(ObjectSlot<T> *slot) noexcept;
+		static ObjectSlot<T> *to_slot(T *object) noexcept;
+
+		void push(ObjectSlot<T> *slot) noexcept;
+		ObjectSlot<T> *pop(void) noexcept;
+
 		std::tuple<Args...> ctor_args;
-		MemoryPool<T> storage;
-		container::lockfree::Stack<T *> free_objects;
+		MemoryPool<ObjectSlot<T>> storage;
+		std::atomic<std::uintptr_t> free_head;
 		std::atomic<std::size_t> in_use_count;
 	};
 }
