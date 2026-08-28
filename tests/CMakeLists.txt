@@ -23,6 +23,7 @@ target_sources(
 		memory/lockfree/memory_pool_test.cpp
 		memory/lockfree/object_pool_test.cpp
 		memory/threadlocal/memory_pool_test.cpp
+		memory/threadlocal/object_pool_test.cpp
 		io/stdio/output_device_test.cpp
 		utility/logger_test.cpp
 		network/protocol/net_packet_buffer_test.cpp
