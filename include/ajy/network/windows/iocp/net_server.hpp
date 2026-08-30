@@ -18,6 +18,7 @@
 #ifndef AJY_NETWORK_WINDOWS_IOCP_NET_SERVER_HPP
 #define AJY_NETWORK_WINDOWS_IOCP_NET_SERVER_HPP
 
+#include <ajy/concurrency/concepts.hpp>
 #include <ajy/container/lockfree/queue.hpp>
 #include <ajy/container/lockfree/stack.hpp>
 #include <ajy/container/ring_buffer.hpp>
@@ -74,6 +75,9 @@ namespace ajy::network::windows::iocp
 		std::shared_ptr<Packet> alloc_packet(std::size_t payload_capacity = Packet::DEFAULT_PAYLOAD_CAPACITY) noexcept;
 		bool send_packet(SessionID id, std::shared_ptr<Packet> packet) noexcept;
 
+		void add_group(concurrency::Group<NetServer> &group) noexcept;
+		bool set_session_group(SessionID id, concurrency::Group<NetServer> *group) noexcept;
+
 	protected:
 		virtual bool on_connection_request(const char *ip, std::uint16_t port) = 0;
 		virtual void on_client_join(SessionID id) noexcept = 0;
@@ -87,6 +91,7 @@ namespace ajy::network::windows::iocp
 
 	private:
 		static constexpr std::uint16_t DEFAULT_MAX_PENDING_SENDS = 1024;
+		static constexpr std::size_t RECV_BUFFER_CAPACITY = 8192;
 		static constexpr std::size_t PENDING_SENDS_INITIAL_CAPACITY = 128;
 		static constexpr std::size_t SEND_BATCH_SIZE = 128;
 		static constexpr std::size_t PACKET_POOL_INITIAL_CAPACITY = 1024;
@@ -96,10 +101,12 @@ namespace ajy::network::windows::iocp
 		{
 			std::uint32_t index;
 
+			std::atomic<concurrency::Group<NetServer> *> group;
+
 			SOCKET socket;
 
 			OVERLAPPED recv_overlapped;
-			container::RingBuffer recv_buffer = container::RingBuffer(65535);
+			container::RingBuffer recv_buffer = container::RingBuffer(RECV_BUFFER_CAPACITY);
 
 			OVERLAPPED send_overlapped;
 			container::lockfree::Queue<std::shared_ptr<const Packet>> pending_sends =
@@ -146,6 +153,7 @@ namespace ajy::network::windows::iocp
 
 		std::thread accept_thread;
 		std::vector<std::thread> worker_threads;
+		std::vector<concurrency::Group<NetServer> *> groups;
 
 		std::unique_ptr<Session[]> sessions;
 		container::lockfree::Stack<std::uint32_t> free_indices;

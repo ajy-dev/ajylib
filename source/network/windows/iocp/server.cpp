@@ -10,6 +10,7 @@
  */
 
 #include <ajy/network/windows/iocp/server.hpp>
+#include <ajy/concurrency/group.hpp>
 #include <ajy/network/protocol/packet_buffer.hpp>
 #include <ajy/windows.hpp>
 
@@ -160,6 +161,7 @@ namespace ajy::network::windows::iocp
 		for (std::uint32_t i = 0; i < max_sessions; ++i)
 		{
 			this->sessions[i].index = i;
+			this->sessions[i].group.store(nullptr, std::memory_order_relaxed);
 			this->sessions[i].socket = INVALID_SOCKET;
 			this->sessions[i].pending_send_count.store(0, std::memory_order_relaxed);
 			this->sessions[i].in_flight_offset = 0;
@@ -184,6 +186,9 @@ namespace ajy::network::windows::iocp
 		this->max_pending_sends.store(DEFAULT_MAX_PENDING_SENDS, std::memory_order_relaxed);
 		this->running.store(true, std::memory_order_release);
 
+		for (concurrency::Group<Server> *group : this->groups)
+			group->start(max_sessions);
+
 		try
 		{
 			this->accept_thread = std::thread(accept_thread_proc, this);
@@ -195,7 +200,7 @@ namespace ajy::network::windows::iocp
 				"std::thread(accept_thread_proc): [Code: %d] %s",
 				error.code().value(),
 				error.what());
-			goto clean_running;
+			goto clean_groups;
 		}
 		this->logger->log(utility::Logger::LogLevel::Info, "Accept thread initialized.");
 
@@ -280,6 +285,9 @@ clean_threads:
 				std::terminate();
 			}
 		}
+clean_groups:
+		for (concurrency::Group<Server> *group : this->groups)
+			group->stop();
 clean_running:
 		this->running.store(false, std::memory_order_release);
 clean_sessions:
@@ -362,6 +370,9 @@ clean_wsa:
 			}
 		}
 		this->worker_threads.clear();
+
+		for (concurrency::Group<Server> *group : this->groups)
+			group->stop();
 
 		this->sessions.reset();
 
@@ -533,6 +544,34 @@ clean_wsa:
 		return true;
 	}
 
+	void Server::add_group(concurrency::Group<Server> &group) noexcept
+	{
+		try
+		{
+			this->groups.push_back(&group);
+		}
+		catch (const std::bad_alloc &error)
+		{
+			this->logger->log(utility::Logger::LogLevel::Fatal, "std::vector::push_back(groups): %s", error.what());
+			std::terminate();
+		}
+	}
+
+	bool Server::set_session_group(SessionID id, concurrency::Group<Server> *group) noexcept
+	{
+		Session *session;
+
+		session = this->acquire_session(id);
+		if (!session)
+			return false;
+
+		session->group.store(group, std::memory_order_release);
+
+		this->release_session(session);
+
+		return true;
+	}
+
 	void Server::accept_thread_proc(Server *server) noexcept
 	{
 		SOCKADDR_IN addr;
@@ -593,8 +632,9 @@ clean_wsa:
 			server->accept_count.fetch_add(1, std::memory_order_relaxed);
 			server->active_session_count.fetch_add(1, std::memory_order_relaxed);
 			session->ref_count.fetch_add(1, std::memory_order_relaxed);
-			if (server->recv_post(session))
-				server->on_client_join(server->pack_session_id(index.value(), session->generation.load(std::memory_order_relaxed)));
+
+			server->on_client_join(server->pack_session_id(index.value(), session->generation.load(std::memory_order_relaxed)));
+			server->recv_post(session);
 			server->release_session(session);
 		}
 	}
@@ -709,8 +749,15 @@ clean_wsa:
 
 				for (std::unique_ptr<Packet> &packet : packets)
 				{
+					concurrency::Group<Server> *group;
+
 					server->recv_count.fetch_add(1, std::memory_order_relaxed);
-					server->on_recv(id, std::move(packet));
+
+					group = session->group.load(std::memory_order_acquire);
+					if (group)
+						group->post_recv(id, std::move(packet));
+					else
+						server->on_recv(id, std::move(packet));
 				}
 			}
 			else if (overlapped == &session->send_overlapped)
@@ -827,6 +874,7 @@ clean_wsa:
 		if (session->ref_count.fetch_sub(1, std::memory_order_release) == 1)
 		{
 			SessionID id;
+			concurrency::Group<Server> *group;
 
 			try
 			{
@@ -843,6 +891,7 @@ clean_wsa:
 			}
 
 			id = this->pack_session_id(session->index, session->generation.load(std::memory_order_relaxed));
+			group = session->group.exchange(nullptr, std::memory_order_acq_rel);
 
 			::closesocket(session->socket);
 			session->socket = INVALID_SOCKET;
@@ -856,6 +905,12 @@ clean_wsa:
 			session->pending_send_count.store(0, std::memory_order_relaxed);
 			session->send_flag.store(false, std::memory_order_relaxed);
 			session->disconnect_flag.store(false, std::memory_order_relaxed);
+
+			// post_leave must precede the slot release. Once the index is back in
+			// free_indices, accept may reuse it and post the new session's Enter
+			// ahead of this Leave, leaving the departing membership unresolved.
+			if (group)
+				group->post_leave(id);
 
 			if (!this->free_indices.push(session->index))
 				this->logger->log(utility::Logger::LogLevel::Error, "free_indices.push() failed. Slot lost. index: %u", session->index);
