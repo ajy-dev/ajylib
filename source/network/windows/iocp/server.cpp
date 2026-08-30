@@ -379,7 +379,7 @@ clean_wsa:
 		if (!session)
 			return false;
 
-		session->disconnect_flag.store(true, std::memory_order_relaxed);
+		session->disconnect_flag.store(true, std::memory_order_seq_cst);
 		::CancelIoEx(reinterpret_cast<HANDLE>(session->socket), nullptr);
 
 		this->logger->log(utility::Logger::LogLevel::Info, "Force disconnect id: %llu", id);
@@ -919,6 +919,10 @@ clean_wsa:
 				return false;
 			}
 		}
+
+		if (session->disconnect_flag.load(std::memory_order_seq_cst))
+			::CancelIoEx(reinterpret_cast<HANDLE>(session->socket), nullptr);
+
 		return true;
 	}
 
@@ -1035,6 +1039,9 @@ clean_wsa:
 					return;
 				}
 			}
+
+			if (session->disconnect_flag.load(std::memory_order_seq_cst))
+				::CancelIoEx(reinterpret_cast<HANDLE>(session->socket), nullptr);
 
 			break;
 		}
