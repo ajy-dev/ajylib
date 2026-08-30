@@ -14,6 +14,7 @@
 #include <ajy/windows.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -328,6 +329,21 @@ clean_wsa:
 			}
 		}
 
+		for (std::uint32_t i = 0; i < this->max_sessions; ++i)
+			this->disconnect(this->pack_session_id(i, this->sessions[i].generation.load(std::memory_order_relaxed)));
+
+		while (true)
+		{
+			std::uint32_t remaining;
+
+			remaining = this->active_session_count.load(std::memory_order_relaxed);
+			if (!remaining)
+				break;
+
+			this->logger->log(utility::Logger::LogLevel::Info, "stop(): waiting for %u sessions to close.", remaining);
+			std::this_thread::sleep_for(std::chrono::milliseconds(SHUTDOWN_POLL_INTERVAL_MS));
+		}
+
 		for (std::size_t i = 0; i < this->worker_threads.size(); ++i)
 			::PostQueuedCompletionStatus(this->iocp_handle, 0, 0, nullptr);
 		for (std::thread &threads : this->worker_threads)
@@ -351,20 +367,10 @@ clean_wsa:
 		}
 		this->worker_threads.clear();
 
-		for (std::uint32_t i = 0; i < this->max_sessions; ++i)
-		{
-			if (this->sessions[i].socket != INVALID_SOCKET)
-			{
-				::closesocket(this->sessions[i].socket);
-				this->on_client_leave(this->pack_session_id(i, this->sessions[i].generation.load(std::memory_order_relaxed)));
-			}
-		}
 		this->sessions.reset();
 
 		while (this->free_indices.pop().has_value())
 			;
-
-		this->active_session_count.store(0, std::memory_order_relaxed);
 
 		if (this->iocp_handle)
 		{
@@ -600,7 +606,7 @@ clean_wsa:
 
 	void NetServer::worker_thread_proc(NetServer *server) noexcept
 	{
-		while (server->running.load(std::memory_order_acquire))
+		while (true)
 		{
 			DWORD bytes_transferred;
 			ULONG_PTR completion_key;
@@ -634,6 +640,7 @@ clean_wsa:
 				switch (error_code)
 				{
 				case ERROR_NETNAME_DELETED:
+				case ERROR_OPERATION_ABORTED:
 					level = utility::Logger::LogLevel::Debug;
 					break;
 				default:

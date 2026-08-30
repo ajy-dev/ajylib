@@ -90,6 +90,7 @@ namespace ajy::network::windows::iocp
 		static constexpr std::size_t PENDING_SENDS_INITIAL_CAPACITY = 128;
 		static constexpr std::size_t SEND_BATCH_SIZE = 128;
 		static constexpr std::size_t PACKET_POOL_INITIAL_CAPACITY = 1024;
+		static constexpr std::int64_t SHUTDOWN_POLL_INTERVAL_MS = 1'000;
 
 		struct Session
 		{
