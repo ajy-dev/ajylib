@@ -11,7 +11,7 @@
  *	constructor; random_key is drawn per packet by the server.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: 2026-08-09
+ * Updated: 2026-08-30
  * Version: 0.1.0
  */
 
@@ -56,6 +56,9 @@ namespace ajy::network::windows::iocp
 		NetServer &operator=(const NetServer &other) = delete;
 		NetServer(NetServer &&other) = delete;
 		NetServer &operator=(NetServer &&other) = delete;
+
+		static SessionID pack_session_id(std::uint32_t index, std::uint32_t generation) noexcept;
+		static std::pair<std::uint32_t, std::uint32_t> unpack_session_id(SessionID id) noexcept;
 
 		bool start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept override;
 		void stop(void) noexcept override;
@@ -114,9 +117,6 @@ namespace ajy::network::windows::iocp
 
 		static void accept_thread_proc(NetServer *server) noexcept;
 		static void worker_thread_proc(NetServer *server) noexcept;
-
-		static SessionID pack_session_id(std::uint32_t index, std::uint32_t generation) noexcept;
-		static std::pair<std::uint32_t, std::uint32_t> unpack_session_id(SessionID id) noexcept;
 
 		static std::uint32_t calculate_tps(
 			std::atomic<std::uint32_t> &counter,

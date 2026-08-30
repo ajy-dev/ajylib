@@ -97,6 +97,8 @@ target_sources(
 			include/ajy/utility/monitor/probe.hpp
 			include/ajy/utility/monitor/monitor.hpp
 			include/ajy/utility/monitor/monitor_console_commands.hpp
+			include/ajy/concurrency/concepts.hpp
+			include/ajy/concurrency/group.hpp
 			include/ajy/network/server.hpp
 			include/ajy/network/server_console_commands.hpp
 			include/ajy/network/protocol/packet_buffer.hpp
