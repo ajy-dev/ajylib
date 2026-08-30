@@ -5,7 +5,7 @@
  *	A minimal echo server built on ajy::network::windows::iocp::Server.
  * Author: ajy-dev
  * Created: 2026-07-02
- * Updated: 2026-07-06
+ * Updated: 2026-08-30
  * Version: 0.1.0
  */
 
@@ -22,6 +22,7 @@ class EchoServer : public ajy::network::windows::iocp::Server
 {
 public:
 	using ajy::network::windows::iocp::Server::Server;
+	~EchoServer(void) noexcept override;
 
 protected:
 	bool on_connection_request(const char *ip, std::uint16_t port) override;

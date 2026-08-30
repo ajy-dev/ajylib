@@ -5,7 +5,7 @@
  *	A Windows IOCP TCP server definition.
  * Author: ajy-dev
  * Created: 2026-06-30
- * Updated: 2026-07-21
+ * Updated: 2026-08-30
  * Version: 0.1.0
  */
 
@@ -60,7 +60,11 @@ namespace ajy::network::windows::iocp
 
 	Server::~Server(void) noexcept
 	{
-		this->stop();
+		if (!this->running.load(std::memory_order_acquire))
+			return;
+
+		std::fprintf(stderr, "ajy::network::windows::iocp::Server::~Server() failed: destroyed while running.\n");
+		std::terminate();
 	}
 
 	bool Server::start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept

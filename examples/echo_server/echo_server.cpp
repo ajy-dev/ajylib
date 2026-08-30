@@ -5,7 +5,7 @@
  *	A minimal echo server built on ajy::network::windows::iocp::Server.
  * Author: ajy-dev
  * Created: 2026-07-02
- * Updated: 2026-07-06
+ * Updated: 2026-08-30
  * Version: 0.1.0
  */
 
@@ -16,6 +16,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+
+EchoServer::~EchoServer(void) noexcept
+{
+	this->stop();
+}
 
 bool EchoServer::on_connection_request(const char *ip, std::uint16_t port)
 {

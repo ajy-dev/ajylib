@@ -5,7 +5,7 @@
  *	A Windows IOCP obfuscated-protocol TCP server definition.
  * Author: ajy-dev
  * Created: 2026-07-06
- * Updated: 2026-07-21
+ * Updated: 2026-08-30
  * Version: 0.1.0
  */
 
@@ -64,7 +64,11 @@ namespace ajy::network::windows::iocp
 
 	NetServer::~NetServer(void) noexcept
 	{
-		this->stop();
+		if (!this->running.load(std::memory_order_acquire))
+			return;
+
+		std::fprintf(stderr, "ajy::network::windows::iocp::NetServer::~NetServer() failed: destroyed while running.\n");
+		std::terminate();
 	}
 
 	bool NetServer::start(const char *bind_ip, std::uint16_t port, int worker_thread_count, bool nagle, std::uint32_t max_sessions) noexcept
