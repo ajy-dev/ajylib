@@ -32,6 +32,10 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 
 ![아키텍처](documents/images/architecture.drawio.svg)
 
+위 그림은 기본적인 서버 코어 라이브러리의 패킷 송수신 흐름입니다.
+
+각 예제 설명을 여시면 각 예제별 추가 구현 부분을 포함하여 더 자세히 확인하실 수 있습니다.
+
 ## Modules
 
 라이브러리는 `ajy` 네임스페이스 아래 6개 카테고리로 구성됩니다.
@@ -108,13 +112,34 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 
 ## Examples
 
-저장소에는 라이브러리를 사용하는 서버 예제 6종이 포함됩니다. 각 예제는 앞선
-예제의 구조 위에 요소를 하나씩 더해가며, 라이브러리가 실제 서버 구현에 충분한지
-확인하는 대상이 됩니다.
+이 라이브러리를 사용하는 서버 예제 6종에 대한 설명입니다.
 
-측정은 Xeon E5-2680 v4(14C/28T) · 16GB · Intel I210 GbE ×2 · Windows Server 2019
-서버에서 진행했으며, 부하 생성기는 i5급 1U 서버 2대를 각각 별도 서브넷에
-연결했습니다.
+모든 서버 예제의 실험은 일반 PC가 아니라, 서버용 PC와 별도의 네트워크로 연결된 부하 테스트용 PC 2개를 사용하여 테스트하였습니다.
+
+<details>
+<summary>테스트 하드웨어 구성</summary>
+
+**서버**
+
+| | |
+|---|---|
+| CPU | Intel Xeon E5-2680 v4 · 14C/28T · 2.4GHz |
+| 메모리 | 16GB DDR4-2400 |
+| NIC | Intel I210 GbE ×2 |
+| OS | Windows Server 2019 |
+
+**부하 생성기**
+
+| | 부하기 1 | 부하기 2 |
+|---|---|---|
+| CPU | Intel Core i5-4460 · 4C/4T · 3.2GHz | Intel Core i5-4690 · 4C/4T · 3.5GHz |
+| 메모리 | 8GB DDR3-1600 | 4GB DDR3-1600 |
+| NIC | Realtek GbE | Realtek GbE |
+| OS | Windows Server 2019 | Windows Server 2019 |
+
+서버의 I210 두 포트가 각각 하나의 부하 생성기와 별도 서브넷으로 연결됩니다.
+
+</details>
 
 <details>
 <summary>echo_server</summary>
