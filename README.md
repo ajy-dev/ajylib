@@ -9,15 +9,24 @@
 
 ## Overview
 
-ajylib는 Windows IOCP 위에 게임 서버를 구현하기 위한 C++20 라이브러리입니다.
-상용 프레임워크에 의존하지 않고 네트워크 계층, lock-free 자료구조, 메모리 풀,
-직렬 처리 모델을 직접 구현하여, 게임 서버가 요구하는 성능과 동시성 문제를
-다루는 것을 목표로 했습니다. 구현 과정에서는 컴파일러 확장에 의존하지 않고
-표준 C++ 범위 안에 머무르도록 노력했습니다.
+ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 게임 서버 코어 라이브러리입니다.
 
-라이브러리 API가 실제 서버 구현에 충분한지, 부하 상태에서 성능이 유지되는지,
-장시간 운영에서 안정적인지를 검증하기 위해 서버 예제 6종을 함께 구현했습니다.
-예제는 단순 에코 서버에서 시작해 다중 서버 인증 구성까지 확장됩니다.
+외부 프레임워크에 의존하지 않고 네트워크 계층, lock-free 자료구조, 메모리 풀,
+직렬 처리 모델 등을 직접 구현했습니다.
+
+또한, 게임 서버의 다양한 부하 상황들을 모방한 부하 테스트 등을 실시하여, 다양한 멀티스레드 동시성 문제나 성능 문제들을 겪어보고 발전시키는 것을 목표로 하였습니다.
+
+> #### 초기 설계 기준 30~40만 TPS -> 7일간 평균 165만 TPS
+>
+> 싱글 게임 스레드를 가정한 Echo 부하 테스트에서 처음 대비 약 **4.5배** 성능 개선
+
+> #### 수 분마다 유령 세션 발생 -> 7일 무중단 테스트 실행에서 유령 세션 0개
+>
+> 세션 수명에서 lock-free queue까지, 원인 추적을 위한 디버깅 과정의 기록
+
+> #### 수 시간마다 로그인 토큰 실패 -> 7일 무중단 테스트 로그인 실패 0개
+>
+> 로그인 서버와 채팅 서버의 분산 구조에서의 동시성과 순서 문제 추적의 기록
 
 ## Architecture
 
@@ -35,16 +44,16 @@ ajylib는 Windows IOCP 위에 게임 서버를 구현하기 위한 C++20 라이�
 | `SerializationBuffer` | 직렬화 버퍼. 스트림 연산자로 타입별 읽기·쓰기 지원 |
 | `lockfree::Stack` | 태그드 포인터 CAS 기반 Treiber 스택 |
 | `lockfree::Queue` | 태그드 포인터 CAS 기반 Michael-Scott 큐 |
-| `mpsc::Queue` | 다중 생산자·단일 소비자 유계 큐 |
+| `mpsc::Queue` | 다중 생산자·단일 소비자 Bounded Queue |
 
 ### memory
 
 | 모듈 | 설명 |
 |---|---|
-| `lockfree::MemoryPool` | 고정 크기 블록 풀. 다중 스레드 할당·해제 |
-| `lockfree::ObjectPool` | 객체 단위 풀. 생성자·소멸자 호출 관리 |
-| `threadlocal::MemoryPool` | 스레드 지역 블록 풀. 원자적 연산 없이 동작 |
-| `threadlocal::ObjectPool` | 스레드 지역 객체 풀 |
+| `lockfree::MemoryPool` | 객체 크기 단위로 고정 크기 블록을 할당하는 lock-free 메모리 풀 |
+| `lockfree::ObjectPool` | 객체 단위의 재사용을 위한 lock-free 오브젝트 풀 |
+| `threadlocal::MemoryPool` | TLS를 사용하는 메모리 풀 |
+| `threadlocal::ObjectPool` | TLS를 사용하는 오브젝트 풀 |
 
 ### network
 
@@ -52,24 +61,24 @@ ajylib는 Windows IOCP 위에 게임 서버를 구현하기 위한 C++20 라이�
 |---|---|
 | `Server` | 서버 인터페이스. 가상 함수로 콘텐츠 계층과 분리 |
 | `windows::iocp::Server` | IOCP 기반 서버 구현 |
-| `windows::iocp::NetServer` | 헤더·체크섬·난독화를 적용한 프로토콜 서버 |
-| `protocol::PacketBuffer` | 패킷 직렬화 버퍼 |
-| `protocol::NetPacketBuffer` | 네트워크 헤더가 붙는 패킷 버퍼 |
-| `protocol::Obfuscator` | 패킷 페이로드 난독화 |
+| `windows::iocp::NetServer` | 헤더·체크섬·난독화를 적용한 프로토콜을 사용하는 서버 |
+| `protocol::PacketBuffer` | `Server`에서 사용하는 패킷 직렬화 버퍼 |
+| `protocol::NetPacketBuffer` | `NetServer`에서 사용하는 난독화가 포함된 패킷 버퍼 |
+| `protocol::Obfuscator` | 패킷 본문의 난독화/복호화 |
 
 ### concurrency
 
 | 모듈 | 설명 |
 |---|---|
-| `Group` | 세션 집합을 전용 스레드에서 직렬 처리하는 단위 |
+| `Group` | 세션 집합의 로직을 Actor 모델과 유사하게 전용 스레드에서 직렬 처리하는 단위 |
 
 ### utility
 
 | 모듈 | 설명 |
 |---|---|
-| `Logger` | 전용 스레드에서 동작하는 비동기 로거 |
-| `Console` | 서버 제어용 콘솔 명령 처리 |
-| `Monitor` | 프로세스·시스템 리소스 지표 수집 |
+| `Logger` | 전용 스레드에서 비동기적으로 동작하는 로거 |
+| `Console` | 서버 제어용 콘솔 명령 처리기 |
+| `Monitor` | 프로세스·시스템 리소스 지표 수집기 |
 
 ### io
 
