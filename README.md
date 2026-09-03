@@ -30,13 +30,14 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 
 ## Architecture
 
-![아키텍처](documents/images/architecture.drawio.png)
+![아키텍처](documents/images/architecture.drawio.svg)
 
 ## Modules
 
 라이브러리는 `ajy` 네임스페이스 아래 6개 카테고리로 구성됩니다.
 
-### container
+<details>
+<summary>container</summary>
 
 | 모듈 | 설명 |
 |---|---|
@@ -46,7 +47,10 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 | `lockfree::Queue` | 태그드 포인터 CAS 기반 Michael-Scott 큐 |
 | `mpsc::Queue` | 다중 생산자·단일 소비자 Bounded Queue |
 
-### memory
+</details>
+
+<details>
+<summary>memory</summary>
 
 | 모듈 | 설명 |
 |---|---|
@@ -55,7 +59,10 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 | `threadlocal::MemoryPool` | TLS를 사용하는 메모리 풀 |
 | `threadlocal::ObjectPool` | TLS를 사용하는 오브젝트 풀 |
 
-### network
+</details>
+
+<details>
+<summary>network</summary>
 
 | 모듈 | 설명 |
 |---|---|
@@ -66,13 +73,19 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 | `protocol::NetPacketBuffer` | `NetServer`에서 사용하는 난독화가 포함된 패킷 버퍼 |
 | `protocol::Obfuscator` | 패킷 본문의 난독화/복호화 |
 
-### concurrency
+</details>
+
+<details>
+<summary>concurrency</summary>
 
 | 모듈 | 설명 |
 |---|---|
 | `Group` | 세션 집합의 로직을 Actor 모델과 유사하게 전용 스레드에서 직렬 처리하는 단위 |
 
-### utility
+</details>
+
+<details>
+<summary>utility</summary>
 
 | 모듈 | 설명 |
 |---|---|
@@ -80,13 +93,18 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 | `Console` | 서버 제어용 콘솔 명령 처리기 |
 | `Monitor` | 프로세스·시스템 리소스 지표 수집기 |
 
-### io
+</details>
+
+<details>
+<summary>io</summary>
 
 | 모듈 | 설명 |
 |---|---|
 | `OutputDevice` | 출력 장치 추상 인터페이스 |
 | `stdio::OutputDevice` | 표준 출력 구현 |
 | `windows::OutputDevice` | Windows 콘솔 API 구현 |
+
+</details>
 
 ## Examples
 
@@ -98,7 +116,8 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 서버에서 진행했으며, 부하 생성기는 i5급 1U 서버 2대를 각각 별도 서브넷에
 연결했습니다.
 
-### echo_server
+<details>
+<summary>echo_server</summary>
 
 `iocp::Server`를 직접 상속한 최소 구성입니다. 2바이트 길이 헤더만 사용하며,
 수신한 페이로드를 그대로 되돌려보냅니다. 콘텐츠 스레드도 그룹도 없어 IOCP 워커가
@@ -108,7 +127,10 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 부하 생성기 2대에서 각 100 세션이 8바이트 페이로드를 응답 대기 없이 200개까지
 중첩 전송하는 조건에서 239만 TPS를 기록했습니다.
 
-### chat_server
+</details>
+
+<details>
+<summary>chat_server</summary>
 
 `NetServer`를 사용하는 첫 예제로, 5바이트 헤더와 체크섬, 난독화가 적용된 프로토콜
 경로를 사용합니다. 50×50 섹터 배열 위에 플레이어를 배치하고 자신을 포함한 3×3
@@ -127,7 +149,10 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 적체 9,700을 기록했고, 멀티스레드 구성은 UPDATE TPS 19,000, Job 큐 적체 거의
 없음을 기록했습니다.
 
-### monitor_server
+</details>
+
+<details>
+<summary>monitor_server</summary>
 
 다른 예제들이 보내는 지표를 수집해 MySQL에 적재하는 서버입니다. 하나의
 `NetServer`가 지표를 보내는 서버와 조회 도구를 함께 받으며, 로그인 패킷 종류로
@@ -139,7 +164,10 @@ ajylib는 학습을 목적으로 Windows IOCP를 사용하여 직접 개발한 �
 서버 프로세스가 아닌 별도 객체를 통해 호스트 자체의 지표도 같은 경로로
 수집합니다.
 
-### login_gated_chat
+</details>
+
+<details>
+<summary>login_gated_chat</summary>
 
 로그인 서버와 채팅 서버를 분리하고 그 사이를 Redis 인증 티켓으로 연결한 구성입니다.
 로그인 서버는 MySQL로 계정을 인증하고 Redis에 TTL 10초의 일회용 티켓을 발급하며,
@@ -162,7 +190,10 @@ Recv TPS 7,000대, Send TPS 35,000대를 유지했으며, 누적 4억 4,900만 �
 경합이 관측되어 원자적 비교-삭제로 차단했으며, 이후 두 역할을 별도 키로 분리하는
 현재 구조로 재설계했습니다.
 
-### echo_with_group
+</details>
+
+<details>
+<summary>echo_with_group</summary>
 
 `concurrency::Group`을 사용하는 구성입니다. 세션은 접속 시 인증 그룹에 들어가
 로그인을 처리한 뒤 에코 그룹으로 이동하며, 각 그룹은 전용 스레드에서 소속 세션의
@@ -179,7 +210,10 @@ Recv TPS 7,000대, Send TPS 35,000대를 유지했으며, 누적 4억 4,900만 �
 양방향 각 60만 ~ 70만 TPS를 유지했습니다. 메모리는 두 테스트 모두 1GB 미만을
 유지했습니다.
 
-### echo_with_group_intent
+</details>
+
+<details>
+<summary>echo_with_group_intent</summary>
 
 `echo_with_group`과 한 곳만 다릅니다. 그룹 스레드가 완성된 패킷 대신 응답에 필요한
 필드만 담은 32바이트 값을 송신 워커에 넘기고, 패킷 할당과 직렬화를 워커가
@@ -194,9 +228,12 @@ Recv TPS 7,000대, Send TPS 35,000대를 유지했으며, 누적 4억 4,900만 �
 꺼내는 비용이 직렬 구간에서 덜어낸 비용을 상쇄합니다. 에코 응답이 고정된 몇 개의
 필드로 표현되기 때문에 성립하는 구성이며, 참고용으로 함께 둡니다.
 
+</details>
+
 ## Building
 
-### 요구사항
+<details>
+<summary>요구사항</summary>
 
 - Windows x64
 - CMake 4.2 이상
@@ -205,7 +242,10 @@ Recv TPS 7,000대, Send TPS 35,000대를 유지했으며, 누적 4억 4,900만 �
 GoogleTest와 hiredis는 CMake가 빌드 시점에 내려받습니다. MySQL 연동 예제는 MySQL
 C API가 별도로 설치되어 있어야 합니다.
 
-### 빌드
+</details>
+
+<details>
+<summary>빌드</summary>
 
 ```
 cmake -S . -B build
@@ -215,7 +255,10 @@ cmake --build build --config Release
 빌드 구성은 `Debug`, `NoOptRelease`, `Release` 세 가지입니다. `NoOptRelease`는
 최적화를 끄되 릴리스 런타임을 사용하는 구성입니다.
 
-### 클린 빌드
+</details>
+
+<details>
+<summary>클린 빌드</summary>
 
 ```
 cmake -E rm -rf build
@@ -223,7 +266,10 @@ cmake -S . -B build
 cmake --build build --config Release
 ```
 
-### 테스트
+</details>
+
+<details>
+<summary>테스트</summary>
 
 GoogleTest 기반 단위 테스트가 포함되어 있습니다.
 
@@ -231,7 +277,10 @@ GoogleTest 기반 단위 테스트가 포함되어 있습니다.
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-### 옵션
+</details>
+
+<details>
+<summary>옵션</summary>
 
 | 옵션 | 기본값 | 설명 |
 |---|---|---|
@@ -244,6 +293,8 @@ ctest --test-dir build -C Release --output-on-failure
 cmake -S . -B build -DAJYLIB_BUILD_TESTS=OFF -DAJYLIB_BUILD_EXAMPLES=OFF
 cmake --build build --config Release
 ```
+
+</details>
 
 ## License
 
