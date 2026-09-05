@@ -9,7 +9,7 @@
 
 ## Highlight
 
-![하이라이트 슬라이드 1](documents/images/highlight_1.png)
+![하이라이트 슬라이드 1](documents/images/highlight_2.png)
 
 ![하이라이트 슬라이드 2](documents/images/highlight_2.png)
 
